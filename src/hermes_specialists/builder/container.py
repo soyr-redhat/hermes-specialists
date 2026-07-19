@@ -124,3 +124,45 @@ def build_image(
         if log_callback:
             log_callback("[red]build timed out after 600s[/red]")
         return False
+
+
+def push_image(
+    specialist: Specialist,
+    config: GlobalConfig,
+    log_callback=None,
+) -> bool:
+    """Push a specialist's container image to the registry."""
+    tag = f"{config.registry.url}/{specialist.dir_name}:latest"
+    cmd = ["podman", "push", tag]
+
+    if log_callback:
+        log_callback(f"$ {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if log_callback:
+            if result.stdout:
+                log_callback(result.stdout)
+            if result.stderr:
+                log_callback(result.stderr)
+        return result.returncode == 0
+    except FileNotFoundError:
+        if log_callback:
+            log_callback("[red]podman not found, trying docker...[/red]")
+        cmd[0] = "docker"
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if log_callback:
+                if result.stdout:
+                    log_callback(result.stdout)
+                if result.stderr:
+                    log_callback(result.stderr)
+            return result.returncode == 0
+        except FileNotFoundError:
+            if log_callback:
+                log_callback("[red]neither podman nor docker found[/red]")
+            return False
+    except subprocess.TimeoutExpired:
+        if log_callback:
+            log_callback("[red]push timed out after 300s[/red]")
+        return False

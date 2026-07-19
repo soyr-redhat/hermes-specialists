@@ -12,6 +12,7 @@ from hermes_specialists.builder.container import (
     generate_cli_config,
     generate_containerfile,
     prepare_build_context,
+    push_image,
 )
 from hermes_specialists.models import GlobalConfig, Specialist, VLLMEndpoint
 
@@ -143,3 +144,34 @@ class TestBuildImage:
 
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="podman", timeout=600)
         assert build_image(sample_specialist, sample_config, project) is False
+
+
+class TestPushImage:
+    @patch("hermes_specialists.builder.container.subprocess.run")
+    def test_success(self, mock_run, sample_specialist, sample_config):
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        assert push_image(sample_specialist, sample_config) is True
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "podman"
+        assert cmd[1] == "push"
+        assert "quay.io/sawyer/test-bot:latest" in cmd[2]
+
+    @patch("hermes_specialists.builder.container.subprocess.run")
+    def test_failure(self, mock_run, sample_specialist, sample_config):
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="auth required")
+        assert push_image(sample_specialist, sample_config) is False
+
+    @patch("hermes_specialists.builder.container.subprocess.run")
+    def test_podman_fallback_to_docker(self, mock_run, sample_specialist, sample_config):
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == "podman":
+                raise FileNotFoundError
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = side_effect
+        assert push_image(sample_specialist, sample_config) is True
+
+    @patch("hermes_specialists.builder.container.subprocess.run")
+    def test_timeout(self, mock_run, sample_specialist, sample_config):
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="podman", timeout=300)
+        assert push_image(sample_specialist, sample_config) is False

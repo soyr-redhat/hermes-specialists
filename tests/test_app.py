@@ -304,23 +304,50 @@ class TestBuildAll:
 
 class TestDeployOne:
     @patch("hermes_specialists.builder.deployer.subprocess.run")
+    @patch("hermes_specialists.builder.container.subprocess.run")
     @patch(f"{MODULE}._fuzzy")
-    def test_deploys_specialist(self, mock_fuzzy, mock_run, app, project_dir):
+    def test_deploys_specialist(self, mock_fuzzy, mock_build_run, mock_deploy_run, app, project_dir):
         Specialist(name="bot").save(project_dir / "specialists")
 
         mock_fuzzy.return_value = "bot"
-        mock_run.return_value = MagicMock(returncode=0, stdout="deployed", stderr="")
+        mock_build_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_deploy_run.return_value = MagicMock(returncode=0, stdout="deployed", stderr="")
 
         app._deploy_one()
 
-        assert mock_run.called
-        cmd = mock_run.call_args[0][0]
+        assert mock_deploy_run.called
+        cmd = mock_deploy_run.call_args[0][0]
         assert cmd[0] == "oc"
         assert "apply" in cmd
 
         manifest = project_dir / ".deploy" / "bot.yaml"
         assert manifest.exists()
         assert "bot" in manifest.read_text()
+
+    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch(f"{MODULE}._fuzzy")
+    def test_deploy_stops_on_build_failure(self, mock_fuzzy, mock_run, app, project_dir):
+        Specialist(name="bot").save(project_dir / "specialists")
+        mock_fuzzy.return_value = "bot"
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="build error")
+        app._deploy_one()
+        assert not (project_dir / ".deploy").exists()
+
+    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch(f"{MODULE}._fuzzy")
+    def test_deploy_stops_on_push_failure(self, mock_fuzzy, mock_run, app, project_dir):
+        Specialist(name="bot").save(project_dir / "specialists")
+        mock_fuzzy.return_value = "bot"
+
+        call_count = [0]
+        def side_effect(cmd, **kwargs):
+            call_count[0] += 1
+            if "build" in cmd:
+                return MagicMock(returncode=0, stdout="", stderr="")
+            return MagicMock(returncode=1, stdout="", stderr="auth required")
+
+        mock_run.side_effect = side_effect
+        app._deploy_one()
 
 
 # ── config view ─────────────────────────────────────────────────────────
