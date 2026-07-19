@@ -40,11 +40,9 @@ def _select(message: str, choices: list, back: bool = True) -> str | None:
     return None if result == BACK else result
 
 
-def _fuzzy(message: str, choices: list, back: bool = True) -> str | None:
-    if back:
-        choices = list(choices) + [Choice(BACK, name="← back")]
+def _fuzzy(message: str, choices: list) -> str | None:
     try:
-        result = inquirer.fuzzy(
+        return inquirer.fuzzy(
             message=message,
             choices=choices,
             pointer="›",
@@ -54,7 +52,6 @@ def _fuzzy(message: str, choices: list, back: bool = True) -> str | None:
         ).execute()
     except (KeyboardInterrupt, EOFError):
         return None
-    return None if result == BACK else result
 
 
 def _text(message: str, default: str = "") -> str | None:
