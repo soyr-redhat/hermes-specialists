@@ -56,3 +56,21 @@ def templates_dir(tmp_path: Path) -> Path:
     dest = tmp_path / "templates"
     shutil.copytree(TEMPLATES_DIR, dest)
     return dest
+
+
+@pytest.fixture
+def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Set up a full project directory and chdir into it."""
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "specialists").mkdir()
+    shutil.copytree(TEMPLATES_DIR, project / "templates")
+    monkeypatch.chdir(project)
+    return project
+
+
+@pytest.fixture
+def app(project_dir: Path):
+    """Return a HermesSpecialistsApp instance rooted in the project_dir."""
+    from hermes_specialists.app import HermesSpecialistsApp
+    return HermesSpecialistsApp()
