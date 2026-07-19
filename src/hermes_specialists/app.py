@@ -59,9 +59,14 @@ BANNER = """\033[31m
 """
 
 
+def _sep() -> None:
+    console.print(f"  [dim]{'─' * 40}[/dim]")
+
+
 def _select(message: str, choices: list, back: bool = True) -> str | None:
     if back:
         choices = list(choices) + [Separator(), Choice(BACK, name="← back")]
+    _sep()
     try:
         result = inquirer.select(
             message=message,
@@ -78,6 +83,7 @@ def _select(message: str, choices: list, back: bool = True) -> str | None:
 
 
 def _fuzzy(message: str, choices: list) -> str | None:
+    _sep()
     try:
         return inquirer.fuzzy(
             message=message,
