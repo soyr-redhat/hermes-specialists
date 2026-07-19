@@ -9,7 +9,7 @@ import yaml
 
 from hermes_specialists.builder.container import (
     build_image,
-    generate_cli_config,
+    generate_config,
     generate_containerfile,
     prepare_build_context,
     push_image,
@@ -17,49 +17,31 @@ from hermes_specialists.builder.container import (
 from hermes_specialists.models import GlobalConfig, Specialist, VLLMEndpoint
 
 
-class TestGenerateCliConfig:
-    def test_basic_config(self, sample_specialist, sample_config, specialists_dir):
-        cfg = generate_cli_config(sample_specialist, sample_config, specialists_dir)
+class TestGenerateConfig:
+    def test_basic_config(self, sample_specialist, sample_config):
+        cfg = generate_config(sample_specialist, sample_config)
         assert cfg["model"]["provider"] == "custom"
         assert cfg["model"]["base_url"] == "http://localhost:8000/v1"
         assert cfg["model"]["default"] == "kimi-k3"
 
-    def test_uses_named_endpoint(self, sample_config, specialists_dir):
+    def test_uses_named_endpoint(self, sample_config):
         s = Specialist(name="test-bot", endpoint="staging")
-        cfg = generate_cli_config(s, sample_config, specialists_dir)
+        cfg = generate_config(s, sample_config)
         assert cfg["model"]["base_url"] == "http://staging:8000/v1"
 
-    def test_falls_back_to_default(self, sample_config, specialists_dir):
+    def test_falls_back_to_default(self, sample_config):
         s = Specialist(name="test-bot", endpoint="nonexistent")
-        cfg = generate_cli_config(s, sample_config, specialists_dir)
+        cfg = generate_config(s, sample_config)
         assert cfg["model"]["base_url"] == "http://localhost:8000/v1"
 
-    def test_api_key_included(self, sample_config, specialists_dir):
+    def test_api_key_included(self, sample_config):
         s = Specialist(name="test-bot", endpoint="staging")
-        cfg = generate_cli_config(s, sample_config, specialists_dir)
+        cfg = generate_config(s, sample_config)
         assert cfg["model"]["api_key"] == "${STAGING_KEY}"
 
-    def test_no_api_key_when_empty(self, sample_specialist, sample_config, specialists_dir):
-        cfg = generate_cli_config(sample_specialist, sample_config, specialists_dir)
+    def test_no_api_key_when_empty(self, sample_specialist, sample_config):
+        cfg = generate_config(sample_specialist, sample_config)
         assert "api_key" not in cfg["model"]
-
-    def test_system_prompt_included(self, sample_specialist, sample_config, specialists_dir):
-        cfg = generate_cli_config(sample_specialist, sample_config, specialists_dir)
-        assert "personalities" in cfg["model"]
-        assert "you are a test bot." in cfg["model"]["personalities"]["specialist"]
-
-    def test_no_system_prompt_when_missing(self, sample_config, tmp_path):
-        base = tmp_path / "specialists"
-        base.mkdir()
-        s = Specialist(name="no-prompt")
-        s.save(base)
-        cfg = generate_cli_config(s, sample_config, base)
-        assert "personalities" not in cfg["model"]
-
-    def test_toolset_fallback(self, sample_config, specialists_dir):
-        s = Specialist(name="test-bot", toolsets=[])
-        cfg = generate_cli_config(s, sample_config, specialists_dir)
-        assert cfg["platform_toolsets"]["cli"] == ["hermes-cli"]
 
 
 class TestGenerateContainerfile:
@@ -76,6 +58,11 @@ class TestGenerateContainerfile:
         result = generate_containerfile(sample_specialist, sample_config, templates_dir)
         assert "COPY skills/" not in result
 
+    def test_copies_config_and_soul(self, sample_specialist, sample_config, templates_dir):
+        result = generate_containerfile(sample_specialist, sample_config, templates_dir)
+        assert "COPY config.yaml" in result
+        assert "COPY SOUL.md" in result
+
 
 class TestPrepareBuildContext:
     def test_creates_files(self, sample_specialist, sample_config, tmp_path, templates_dir):
@@ -84,13 +71,19 @@ class TestPrepareBuildContext:
         shutil.copytree(templates_dir, project / "templates")
         (project / "specialists").mkdir()
         sample_specialist.save(project / "specialists")
+        prompt_file = project / "specialists" / sample_specialist.dir_name / "system-prompt.md"
+        prompt_file.write_text("you are a test bot.\n")
 
         build_dir = prepare_build_context(sample_specialist, sample_config, project / ".build")
-        assert (build_dir / "cli-config.yaml").exists()
+        assert (build_dir / "config.yaml").exists()
+        assert (build_dir / "SOUL.md").exists()
         assert (build_dir / "Containerfile").exists()
 
-        cli_cfg = yaml.safe_load((build_dir / "cli-config.yaml").read_text())
-        assert cli_cfg["model"]["provider"] == "custom"
+        cfg = yaml.safe_load((build_dir / "config.yaml").read_text())
+        assert cfg["model"]["provider"] == "custom"
+
+        soul = (build_dir / "SOUL.md").read_text()
+        assert "test bot" in soul
 
 
 class TestBuildImage:

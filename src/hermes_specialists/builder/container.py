@@ -32,36 +32,22 @@ def _run_streaming(cmd, log_callback=None, cwd=None, timeout=600):
     return proc.returncode == 0
 
 
-def generate_cli_config(specialist: Specialist, config: GlobalConfig, specialists_dir: Path) -> dict:
-    """Generate a Hermes cli-config.yaml for a specialist."""
+def generate_config(specialist: Specialist, config: GlobalConfig) -> dict:
+    """Generate a Hermes config.yaml for a specialist."""
     endpoint = config.get_endpoint(specialist.endpoint) or config.default_endpoint
 
-    cli_config: dict = {
+    hermes_config: dict = {
         "model": {
             "default": specialist.model or endpoint.model or "",
             "provider": "custom",
             "base_url": endpoint.base_url,
         },
-        "terminal": {
-            "backend": "local",
-            "cwd": ".",
-            "timeout": 180,
-        },
-        "platform_toolsets": {
-            "cli": specialist.toolsets if specialist.toolsets else ["hermes-cli"],
-        },
     }
 
     if endpoint.api_key_env:
-        cli_config["model"]["api_key"] = f"${{{endpoint.api_key_env}}}"
+        hermes_config["model"]["api_key"] = f"${{{endpoint.api_key_env}}}"
 
-    system_prompt = specialist.system_prompt(specialists_dir)
-    if system_prompt:
-        cli_config["model"]["personalities"] = {
-            "specialist": system_prompt,
-        }
-
-    return cli_config
+    return hermes_config
 
 
 def generate_containerfile(specialist: Specialist, config: GlobalConfig, templates_dir: Path) -> str:
@@ -82,10 +68,15 @@ def prepare_build_context(specialist: Specialist, config: GlobalConfig, output_d
     build_dir = output_dir / specialist.dir_name
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    cli_config = generate_cli_config(specialist, config, output_dir.parent / "specialists")
-    (build_dir / "cli-config.yaml").write_text(
-        yaml.dump(cli_config, default_flow_style=False, sort_keys=False)
+    specialists_dir = output_dir.parent / "specialists"
+
+    hermes_config = generate_config(specialist, config)
+    (build_dir / "config.yaml").write_text(
+        yaml.dump(hermes_config, default_flow_style=False, sort_keys=False)
     )
+
+    system_prompt = specialist.system_prompt(specialists_dir)
+    (build_dir / "SOUL.md").write_text(system_prompt or f"You are {specialist.name}.\n")
 
     containerfile_content = generate_containerfile(
         specialist, config, output_dir.parent / "templates"
