@@ -1,0 +1,21 @@
+FROM {{ base_image }}
+
+ARG SPECIALIST={{ specialist_name }}
+ENV HERMES_SPECIALIST=${SPECIALIST}
+
+# Copy specialist configuration
+COPY cli-config.yaml ${HERMES_HOME}/.hermes/cli-config.yaml
+
+{% if skills %}
+# Copy specialist skills
+COPY skills/ ${HERMES_HOME}/.hermes/skills/{{ specialist_name }}/
+{% endif %}
+
+{% if context_files %}
+# Copy context files
+COPY context/ ${HERMES_HOME}/context/
+{% endif %}
+
+WORKDIR ${HERMES_HOME}
+USER 1001
+ENTRYPOINT ["hermes"]

@@ -1,0 +1,59 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ specialist_name }}-data
+  labels:
+    app: hermes-specialist
+    specialist: {{ specialist_name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ storage | default("10Gi") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ specialist_name }}
+  labels:
+    app: hermes-specialist
+    specialist: {{ specialist_name }}
+spec:
+  replicas: {{ replicas | default(1) }}
+  selector:
+    matchLabels:
+      app: hermes-specialist
+      specialist: {{ specialist_name }}
+  template:
+    metadata:
+      labels:
+        app: hermes-specialist
+        specialist: {{ specialist_name }}
+    spec:
+      containers:
+        - name: {{ specialist_name }}
+          image: {{ registry }}/{{ specialist_name }}:{{ tag | default("latest") }}
+          command: ["/bin/sh", "-c", "echo '{{ specialist_name }} ready'; exec sleep infinity"]
+          resources:
+            requests:
+              cpu: {{ cpu_request | default("500m") }}
+              memory: {{ memory_request | default("1Gi") }}
+            limits:
+              cpu: {{ cpu_limit | default("2") }}
+              memory: {{ memory_limit | default("4Gi") }}
+          env:
+            - name: HERMES_HOME
+              value: /opt/hermes
+            - name: HERMES_SPECIALIST
+              value: {{ specialist_name }}
+            - name: HOME
+              value: /opt/hermes
+          volumeMounts:
+            - name: specialist-data
+              mountPath: /opt/hermes
+      volumes:
+        - name: specialist-data
+          persistentVolumeClaim:
+            claimName: {{ specialist_name }}-data
