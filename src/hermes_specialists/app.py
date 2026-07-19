@@ -16,10 +16,62 @@ BACK = "__back__"
 
 console = Console(highlight=False)
 
-LOGO = """\033[36m
- ╦ ╦╔═╗╦═╗╔╦╗╔═╗╔═╗
- ╠═╣║╣ ╠╦╝║║║║╣ ╚═╗
- ╩ ╩╚═╝╩╚═╩ ╩╚═╝╚═╝\033[0m specialists
+STYLE = {
+    "questionmark": "#ee0000",
+    "answermark": "#ee0000",
+    "answer": "#ffffff bold",
+    "input": "#ffffff",
+    "question": "#ffffff bold",
+    "answered_question": "#808080",
+    "instruction": "#808080",
+    "long_instruction": "#808080",
+    "pointer": "#ee0000 bold",
+    "checkbox": "#ee0000",
+    "separator": "#4a4a4a",
+    "skipped": "#4a4a4a",
+    "marker": "#ee0000",
+    "fuzzy_prompt": "#ee0000",
+    "fuzzy_info": "#808080",
+    "fuzzy_border": "#4a4a4a",
+    "fuzzy_match": "#ee0000 bold",
+}
+
+BANNER = """\033[31m
+                  *################:
+             *#########################*
+         -#################################=
+      :#########*======+****========*#########-
+    -#########+==================++====#########=
+   ##########*====================##====*#########=
+  ############============================###########
+ =#############===*#*++++++=================###########-
+ *#############=====*##+=====================+###########*
+ *##############===============================*###########*
+ +######+========*===============================############*
+ ####*==========*##*=============================*############*
+ #####============######*=========================+#############
+ *#####==============##########*+==================+===*#########*
+ #######================*#########*================+======*#######
+ ########===================+*#####=========================+#####
+=##########=======================**=========================*####+
+*############*===============================================+####+
+*###############+============================================*####+
+=############### :#+========================================*#####+
+ #############      *#*====================================#######
+ #############       :* *#*==============================*########
+ *#############           #####+======================###########*
+  #          .##:          .###########**+++++**#################
+               +##                          :--  ###############+
+                                                -##############+
+                                                *#############*
+                                    ##*#        #############*
+                                               ####-:..-+=-+=
+                                              ####-
+                                            +##
+                                           ##\033[0m
+
+  \033[1mhermes specialists\033[0m
+  \033[2menterprise & multi-tenant agent serving\033[0m
 """
 
 
@@ -31,8 +83,9 @@ def _select(message: str, choices: list, back: bool = True) -> str | None:
             message=message,
             choices=choices,
             pointer="›",
-            qmark="",
-            amark="",
+            qmark="▸",
+            amark="▸",
+            style=STYLE,
             mandatory=False,
         ).execute()
     except (KeyboardInterrupt, EOFError):
@@ -46,8 +99,9 @@ def _fuzzy(message: str, choices: list) -> str | None:
             message=message,
             choices=choices,
             pointer="›",
-            qmark="",
-            amark="",
+            qmark="▸",
+            amark="▸",
+            style=STYLE,
             mandatory=False,
         ).execute()
     except (KeyboardInterrupt, EOFError):
@@ -59,8 +113,9 @@ def _text(message: str, default: str = "") -> str | None:
         return inquirer.text(
             message=message,
             default=default,
-            qmark="",
-            amark="",
+            qmark="▸",
+            amark="▸",
+            style=STYLE,
             mandatory=False,
         ).execute()
     except (KeyboardInterrupt, EOFError):
@@ -72,8 +127,9 @@ def _confirm(message: str, default: bool = False) -> bool:
         return inquirer.confirm(
             message=message,
             default=default,
-            qmark="",
-            amark="",
+            qmark="▸",
+            amark="▸",
+            style=STYLE,
         ).execute()
     except (KeyboardInterrupt, EOFError):
         return False
@@ -88,7 +144,7 @@ class HermesSpecialistsApp:
         self.specialists_dir = self.project_root / "specialists"
 
     def run(self) -> None:
-        print(LOGO)
+        print(BANNER)
         self._status()
 
         while True:
@@ -130,7 +186,7 @@ class HermesSpecialistsApp:
                 for s in specialists:
                     skills_dir = self.specialists_dir / s.dir_name / "skills"
                     skill_count = len(list(skills_dir.glob("*/SKILL.md"))) if skills_dir.exists() else 0
-                    console.print(f"  [bold]{s.name}[/bold]  [dim]{s.description}[/dim]")
+                    console.print(f"  [bold red]{s.name}[/bold red]  [dim]{s.description}[/dim]")
                     console.print(f"    [dim]endpoint: {s.endpoint}  ·  {skill_count} skill{'s' if skill_count != 1 else ''}[/dim]")
                 console.print()
 
@@ -178,7 +234,7 @@ class HermesSpecialistsApp:
                 encoding="utf-8",
             )
 
-        console.print(f"\n  [green]✓[/green] created {name}")
+        console.print(f"\n  [green]✓[/green] created [bold]{name}[/bold]")
         console.print(f"  [dim]system prompt:[/dim]  specialists/{name}/system-prompt.md")
         console.print(f"  [dim]custom skills:[/dim]  specialists/{name}/skills/\n")
 
@@ -194,7 +250,7 @@ class HermesSpecialistsApp:
         s.model = _text("model", default=s.model) or s.model
 
         s.save(self.specialists_dir)
-        console.print(f"\n  [green]✓[/green] updated {s.name}")
+        console.print(f"\n  [green]✓[/green] updated [bold]{s.name}[/bold]")
         console.print(f"  [dim]system prompt:[/dim]  specialists/{s.dir_name}/system-prompt.md\n")
 
     def _delete_specialist(self) -> None:
@@ -271,7 +327,7 @@ class HermesSpecialistsApp:
                     desc = fm.get("description", "")
                 except (ValueError, yaml.YAMLError):
                     pass
-            console.print(f"  [bold]{skill_dir.name}[/bold]  [dim]{desc}[/dim]")
+            console.print(f"  [bold red]{skill_dir.name}[/bold red]  [dim]{desc}[/dim]")
 
         chain_file = self.specialists_dir / specialist_name / "chain.yaml"
         if chain_file.exists():
@@ -320,10 +376,10 @@ class HermesSpecialistsApp:
         while True:
             ep = self.config.default_endpoint
             console.print()
-            console.print(f"  [bold]{ep.name}[/bold] [dim](default)[/dim]")
+            console.print(f"  [bold red]{ep.name}[/bold red] [dim](default)[/dim]")
             console.print(f"    [dim]{ep.base_url}  ·  model: {ep.model or '(auto)'}[/dim]")
             for ep in self.config.endpoints:
-                console.print(f"  [bold]{ep.name}[/bold]")
+                console.print(f"  [bold red]{ep.name}[/bold red]")
                 console.print(f"    [dim]{ep.base_url}  ·  model: {ep.model or '(auto)'}[/dim]")
             console.print()
 
