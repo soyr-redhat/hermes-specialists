@@ -94,84 +94,84 @@ class TestPrepareBuildContext:
 
 
 class TestBuildImage:
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_success(self, mock_run, sample_specialist, sample_config, tmp_path, templates_dir):
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_success(self, mock_stream, sample_specialist, sample_config, tmp_path, templates_dir):
         project = tmp_path / "project"
         project.mkdir()
         shutil.copytree(templates_dir, project / "templates")
         (project / "specialists").mkdir()
         sample_specialist.save(project / "specialists")
 
-        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_stream.return_value = True
         assert build_image(sample_specialist, sample_config, project) is True
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_failure(self, mock_run, sample_specialist, sample_config, tmp_path, templates_dir):
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_failure(self, mock_stream, sample_specialist, sample_config, tmp_path, templates_dir):
         project = tmp_path / "project"
         project.mkdir()
         shutil.copytree(templates_dir, project / "templates")
         (project / "specialists").mkdir()
         sample_specialist.save(project / "specialists")
 
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
+        mock_stream.return_value = False
         assert build_image(sample_specialist, sample_config, project) is False
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_podman_fallback_to_docker(self, mock_run, sample_specialist, sample_config, tmp_path, templates_dir):
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_podman_fallback_to_docker(self, mock_stream, sample_specialist, sample_config, tmp_path, templates_dir):
         project = tmp_path / "project"
         project.mkdir()
         shutil.copytree(templates_dir, project / "templates")
         (project / "specialists").mkdir()
         sample_specialist.save(project / "specialists")
 
-        def side_effect(cmd, **kwargs):
+        def side_effect(cmd, log_callback=None, **kwargs):
             if cmd[0] == "podman":
                 raise FileNotFoundError
-            return MagicMock(returncode=0, stdout="", stderr="")
+            return True
 
-        mock_run.side_effect = side_effect
+        mock_stream.side_effect = side_effect
         log = []
         assert build_image(sample_specialist, sample_config, project, log_callback=log.append) is True
         assert any("docker" in str(m).lower() or "podman" in str(m).lower() for m in log)
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_timeout(self, mock_run, sample_specialist, sample_config, tmp_path, templates_dir):
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_timeout(self, mock_stream, sample_specialist, sample_config, tmp_path, templates_dir):
         project = tmp_path / "project"
         project.mkdir()
         shutil.copytree(templates_dir, project / "templates")
         (project / "specialists").mkdir()
         sample_specialist.save(project / "specialists")
 
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="podman", timeout=600)
+        mock_stream.side_effect = subprocess.TimeoutExpired(cmd="podman", timeout=600)
         assert build_image(sample_specialist, sample_config, project) is False
 
 
 class TestPushImage:
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_success(self, mock_run, sample_specialist, sample_config):
-        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_success(self, mock_stream, sample_specialist, sample_config):
+        mock_stream.return_value = True
         assert push_image(sample_specialist, sample_config) is True
-        cmd = mock_run.call_args[0][0]
+        cmd = mock_stream.call_args[0][0]
         assert cmd[0] == "podman"
         assert cmd[1] == "push"
         assert "quay.io/sawyer/test-bot:latest" in cmd[2]
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_failure(self, mock_run, sample_specialist, sample_config):
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="auth required")
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_failure(self, mock_stream, sample_specialist, sample_config):
+        mock_stream.return_value = False
         assert push_image(sample_specialist, sample_config) is False
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_podman_fallback_to_docker(self, mock_run, sample_specialist, sample_config):
-        def side_effect(cmd, **kwargs):
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_podman_fallback_to_docker(self, mock_stream, sample_specialist, sample_config):
+        def side_effect(cmd, log_callback=None, **kwargs):
             if cmd[0] == "podman":
                 raise FileNotFoundError
-            return MagicMock(returncode=0, stdout="", stderr="")
+            return True
 
-        mock_run.side_effect = side_effect
+        mock_stream.side_effect = side_effect
         assert push_image(sample_specialist, sample_config) is True
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_timeout(self, mock_run, sample_specialist, sample_config):
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="podman", timeout=300)
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_timeout(self, mock_stream, sample_specialist, sample_config):
+        mock_stream.side_effect = subprocess.TimeoutExpired(cmd="podman", timeout=300)
         assert push_image(sample_specialist, sample_config) is False

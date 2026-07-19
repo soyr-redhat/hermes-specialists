@@ -262,41 +262,41 @@ class TestEndpointRemove:
 
 
 class TestBuildOne:
-    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch("hermes_specialists.builder.container._run_streaming")
     @patch(f"{MODULE}._fuzzy")
-    def test_builds_specialist(self, mock_fuzzy, mock_run, app, project_dir):
+    def test_builds_specialist(self, mock_fuzzy, mock_stream, app, project_dir):
         Specialist(name="bot", model="llama").save(project_dir / "specialists")
         prompt_file = project_dir / "specialists" / "bot" / "system-prompt.md"
         prompt_file.write_text("you are bot\n")
 
         mock_fuzzy.return_value = "bot"
-        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_stream.return_value = True
 
         app._build_one()
 
-        assert mock_run.called
-        call_args = mock_run.call_args
-        assert "podman" in call_args[0][0] or "podman" == call_args[0][0][0]
+        assert mock_stream.called
+        cmd = mock_stream.call_args[0][0]
+        assert cmd[0] == "podman"
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch("hermes_specialists.builder.container._run_streaming")
     @patch(f"{MODULE}._fuzzy")
-    def test_build_failure(self, mock_fuzzy, mock_run, app, project_dir):
+    def test_build_failure(self, mock_fuzzy, mock_stream, app, project_dir):
         Specialist(name="bot").save(project_dir / "specialists")
         mock_fuzzy.return_value = "bot"
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="build error")
+        mock_stream.return_value = False
         app._build_one()
 
 
 class TestBuildAll:
-    @patch("hermes_specialists.builder.container.subprocess.run")
-    def test_builds_multiple(self, mock_run, app, project_dir):
+    @patch("hermes_specialists.builder.container._run_streaming")
+    def test_builds_multiple(self, mock_stream, app, project_dir):
         for name in ["alpha", "bravo"]:
             Specialist(name=name).save(project_dir / "specialists")
-        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_stream.return_value = True
 
         app._build_all()
 
-        assert mock_run.call_count == 2
+        assert mock_stream.call_count == 2
 
     def test_no_specialists(self, app, project_dir):
         app._build_all()
@@ -304,13 +304,13 @@ class TestBuildAll:
 
 class TestDeployOne:
     @patch("hermes_specialists.builder.deployer.subprocess.run")
-    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch("hermes_specialists.builder.container._run_streaming")
     @patch(f"{MODULE}._fuzzy")
-    def test_deploys_specialist(self, mock_fuzzy, mock_build_run, mock_deploy_run, app, project_dir):
+    def test_deploys_specialist(self, mock_fuzzy, mock_stream, mock_deploy_run, app, project_dir):
         Specialist(name="bot").save(project_dir / "specialists")
 
         mock_fuzzy.return_value = "bot"
-        mock_build_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_stream.return_value = True
         mock_deploy_run.return_value = MagicMock(returncode=0, stdout="deployed", stderr="")
 
         app._deploy_one()
@@ -324,29 +324,23 @@ class TestDeployOne:
         assert manifest.exists()
         assert "bot" in manifest.read_text()
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch("hermes_specialists.builder.container._run_streaming")
     @patch(f"{MODULE}._fuzzy")
-    def test_deploy_stops_on_build_failure(self, mock_fuzzy, mock_run, app, project_dir):
+    def test_deploy_stops_on_build_failure(self, mock_fuzzy, mock_stream, app, project_dir):
         Specialist(name="bot").save(project_dir / "specialists")
         mock_fuzzy.return_value = "bot"
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="build error")
+        mock_stream.return_value = False
         app._deploy_one()
         assert not (project_dir / ".deploy").exists()
 
-    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch("hermes_specialists.builder.container._run_streaming")
     @patch(f"{MODULE}._fuzzy")
-    def test_deploy_stops_on_push_failure(self, mock_fuzzy, mock_run, app, project_dir):
+    def test_deploy_stops_on_push_failure(self, mock_fuzzy, mock_stream, app, project_dir):
         Specialist(name="bot").save(project_dir / "specialists")
         mock_fuzzy.return_value = "bot"
 
-        call_count = [0]
-        def side_effect(cmd, **kwargs):
-            call_count[0] += 1
-            if "build" in cmd:
-                return MagicMock(returncode=0, stdout="", stderr="")
-            return MagicMock(returncode=1, stdout="", stderr="auth required")
-
-        mock_run.side_effect = side_effect
+        results = iter([True, False])
+        mock_stream.side_effect = lambda *args, **kwargs: next(results)
         app._deploy_one()
 
 
@@ -401,7 +395,7 @@ class TestNavigation:
 
 
 class TestFullFlow:
-    @patch("hermes_specialists.builder.container.subprocess.run")
+    @patch("hermes_specialists.builder.container._run_streaming")
     @patch(f"{MODULE}._confirm")
     @patch(f"{MODULE}._fuzzy")
     @patch(f"{MODULE}._text")
@@ -409,7 +403,7 @@ class TestFullFlow:
     def test_create_then_build_then_deploy(
         self, mock_select, mock_text, mock_fuzzy, mock_confirm, mock_run, app, project_dir
     ):
-        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_run.return_value = True
 
         mock_select.side_effect = [
             "specialists",

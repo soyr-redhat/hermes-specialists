@@ -11,6 +11,27 @@ from jinja2 import Environment, FileSystemLoader
 from hermes_specialists.models import GlobalConfig, Specialist
 
 
+def _run_streaming(cmd, log_callback=None, cwd=None, timeout=600):
+    """Run a command, streaming output line-by-line to log_callback."""
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        for line in proc.stdout:
+            line = line.rstrip()
+            if line and log_callback:
+                log_callback(f"[dim]{line}[/dim]")
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise
+    return proc.returncode == 0
+
+
 def generate_cli_config(specialist: Specialist, config: GlobalConfig, specialists_dir: Path) -> dict:
     """Generate a Hermes cli-config.yaml for a specialist."""
     endpoint = config.get_endpoint(specialist.endpoint) or config.default_endpoint
@@ -93,29 +114,13 @@ def build_image(
         log_callback(f"  in {build_dir}")
 
     try:
-        result = subprocess.run(
-            cmd, cwd=str(build_dir), capture_output=True, text=True, timeout=600
-        )
-        if log_callback:
-            if result.stdout:
-                log_callback(result.stdout)
-            if result.stderr:
-                log_callback(result.stderr)
-        return result.returncode == 0
+        return _run_streaming(cmd, log_callback, cwd=str(build_dir), timeout=600)
     except FileNotFoundError:
         if log_callback:
             log_callback("[red]podman not found, trying docker...[/red]")
         cmd[0] = "docker"
         try:
-            result = subprocess.run(
-                cmd, cwd=str(build_dir), capture_output=True, text=True, timeout=600
-            )
-            if log_callback:
-                if result.stdout:
-                    log_callback(result.stdout)
-                if result.stderr:
-                    log_callback(result.stderr)
-            return result.returncode == 0
+            return _run_streaming(cmd, log_callback, cwd=str(build_dir), timeout=600)
         except FileNotFoundError:
             if log_callback:
                 log_callback("[red]neither podman nor docker found[/red]")
@@ -139,25 +144,13 @@ def push_image(
         log_callback(f"$ {' '.join(cmd)}")
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        if log_callback:
-            if result.stdout:
-                log_callback(result.stdout)
-            if result.stderr:
-                log_callback(result.stderr)
-        return result.returncode == 0
+        return _run_streaming(cmd, log_callback, timeout=300)
     except FileNotFoundError:
         if log_callback:
             log_callback("[red]podman not found, trying docker...[/red]")
         cmd[0] = "docker"
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            if log_callback:
-                if result.stdout:
-                    log_callback(result.stdout)
-                if result.stderr:
-                    log_callback(result.stderr)
-            return result.returncode == 0
+            return _run_streaming(cmd, log_callback, timeout=300)
         except FileNotFoundError:
             if log_callback:
                 log_callback("[red]neither podman nor docker found[/red]")
