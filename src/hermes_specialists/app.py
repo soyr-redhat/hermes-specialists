@@ -462,7 +462,7 @@ class HermesSpecialistsApp:
         name = self._pick_specialist("deploy")
         if not name:
             return
-        from hermes_specialists.builder.container import build_image, push_image
+        from hermes_specialists.builder.container import build_image, push_image, make_repo_public
         from hermes_specialists.builder.deployer import deploy
 
         s = Specialist.load(self.specialists_dir / name)
@@ -477,6 +477,8 @@ class HermesSpecialistsApp:
         if not push_image(s, self.config, log_callback=log):
             console.print(f"  [red]✗ push failed — run podman login {self.config.registry.url} first[/red]\n")
             return
+
+        make_repo_public(s, self.config, log_callback=log)
 
         console.print(f"\n  [bold]deploying {s.name}...[/bold]")
         ok = deploy(s, self.config, self.project_root, log_callback=log)

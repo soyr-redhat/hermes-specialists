@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
+from urllib import request, error
+import json
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -158,4 +161,52 @@ def push_image(
     except subprocess.TimeoutExpired:
         if log_callback:
             log_callback("[red]push timed out after 300s[/red]")
+        return False
+
+
+def make_repo_public(
+    specialist: Specialist,
+    config: GlobalConfig,
+    log_callback=None,
+) -> bool:
+    """Set the quay.io repository to public via the API."""
+    token = os.environ.get("QUAY_API_TOKEN", "")
+    if not token:
+        env_path = Path.cwd() / ".env"
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                if line.startswith("QUAY_API_TOKEN="):
+                    token = line.split("=", 1)[1].strip()
+                    break
+
+    if not token:
+        if log_callback:
+            log_callback("[dim]no QUAY_API_TOKEN set, skipping visibility change[/dim]")
+        return True
+
+    namespace = config.registry.url.split("/", 1)[-1] if "/" in config.registry.url else config.registry.url
+    repo = specialist.dir_name
+    url = f"https://quay.io/api/v1/repository/{namespace}/{repo}/changevisibility"
+
+    data = json.dumps({"visibility": "public"}).encode()
+    req = request.Request(url, data=data, method="POST")
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            if resp.status == 200:
+                if log_callback:
+                    log_callback(f"[dim]repository {namespace}/{repo} set to public[/dim]")
+                return True
+            if log_callback:
+                log_callback(f"[yellow]visibility API returned {resp.status}[/yellow]")
+            return False
+    except error.HTTPError as e:
+        if log_callback:
+            log_callback(f"[yellow]could not set repo public: {e.code} {e.reason}[/yellow]")
+        return False
+    except Exception as e:
+        if log_callback:
+            log_callback(f"[yellow]could not set repo public: {e}[/yellow]")
         return False
