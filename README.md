@@ -1,8 +1,8 @@
 # hermes-specialists
 
-a user-friendly interface for enterprise and multi-tenant agent serving. configure, build, and deploy specialist [hermes](https://github.com/NousResearch/hermes-agent) agents — each tailored to a specific task, repo, or domain — backed by a shared model endpoint (vllm, ollama, etc.) and deployed to openshift or kubernetes.
+configure, build, and deploy specialist [hermes](https://github.com/NousResearch/hermes-agent) agents for enterprise and multi-tenant serving.
 
-the idea is simple: one fat model, many specialists. each specialist gets its own personality, toolset, skills, and context, packaged into a container image and deployed as a pod. adding a new specialist is a config problem, not an infrastructure problem.
+one model, many specialists. each specialist gets its own system prompt, skills, and context, packaged into a container and deployed as a pod.
 
 ## install
 
@@ -18,9 +18,9 @@ hermes-specialists
 hs
 ```
 
-## what it does
+## how it works
 
-- **dashboard** — view and manage all configured specialists
-- **endpoints** — configure vllm endpoints (global or per-specialist)
-- **editor** — create specialists with custom system prompts, toolsets, skills, and repo context
-- **build & deploy** — generate container images and deploy to openshift with one action
+1. create a specialist (name, endpoint, model)
+2. edit `specialists/<name>/system-prompt.md` to define behavior
+3. drop SKILL.md files into `specialists/<name>/skills/`
+4. build and deploy to openshift

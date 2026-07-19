@@ -11,7 +11,7 @@ from jinja2 import Environment, FileSystemLoader
 from hermes_specialists.models import GlobalConfig, Specialist
 
 
-def generate_cli_config(specialist: Specialist, config: GlobalConfig) -> dict:
+def generate_cli_config(specialist: Specialist, config: GlobalConfig, specialists_dir: Path) -> dict:
     """Generate a Hermes cli-config.yaml for a specialist."""
     endpoint = config.get_endpoint(specialist.endpoint) or config.default_endpoint
 
@@ -34,9 +34,10 @@ def generate_cli_config(specialist: Specialist, config: GlobalConfig) -> dict:
     if endpoint.api_key_env:
         cli_config["model"]["api_key"] = f"${{{endpoint.api_key_env}}}"
 
-    if specialist.system_prompt:
+    system_prompt = specialist.system_prompt(specialists_dir)
+    if system_prompt:
         cli_config["model"]["personalities"] = {
-            "specialist": specialist.system_prompt,
+            "specialist": system_prompt,
         }
 
     return cli_config
@@ -60,7 +61,7 @@ def prepare_build_context(specialist: Specialist, config: GlobalConfig, output_d
     build_dir = output_dir / specialist.dir_name
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    cli_config = generate_cli_config(specialist, config)
+    cli_config = generate_cli_config(specialist, config, output_dir.parent / "specialists")
     (build_dir / "cli-config.yaml").write_text(
         yaml.dump(cli_config, default_flow_style=False, sort_keys=False)
     )

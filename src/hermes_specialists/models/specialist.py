@@ -37,7 +37,6 @@ class Specialist(BaseModel):
     model: str = ""
     endpoint: str = "default"
     personality: str = ""
-    system_prompt: str = ""
     toolsets: list[str] = Field(default_factory=lambda: list(DEFAULT_TOOLSETS))
     skills: list[str] = Field(default_factory=list)
     context_files: list[str] = Field(default_factory=list)
@@ -46,6 +45,12 @@ class Specialist(BaseModel):
     @property
     def dir_name(self) -> str:
         return self.name.lower().replace(" ", "-")
+
+    def system_prompt(self, base_dir: Path) -> str:
+        prompt_file = base_dir / self.dir_name / "system-prompt.md"
+        if prompt_file.exists():
+            return prompt_file.read_text(encoding="utf-8").strip()
+        return ""
 
     def save(self, base_dir: Path) -> None:
         specialist_dir = base_dir / self.dir_name

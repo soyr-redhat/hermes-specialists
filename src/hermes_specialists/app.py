@@ -1,409 +1,438 @@
 from __future__ import annotations
 
-import os
 import shutil
-import sys
 from pathlib import Path
 
+import yaml
+from InquirerPy import inquirer
+from InquirerPy.base.control import Choice
+from InquirerPy.separator import Separator
 from rich.console import Console
-from rich.panel import Panel
-from rich.rule import Rule
-from rich.table import Table
-from rich.prompt import Prompt, Confirm
-from rich.text import Text
-from rich.theme import Theme
 
 from hermes_specialists.models import GlobalConfig, Specialist, VLLMEndpoint
-from hermes_specialists.models.specialist import HERMES_TOOLSETS, DEFAULT_TOOLSETS, BUILTIN_PERSONALITIES
 
 CONFIG_FILE = "config.yaml"
+BACK = "__back__"
 
-theme = Theme({
-    "prompt": "bold cyan",
-    "info": "dim white",
-    "success": "bold green",
-    "warning": "bold yellow",
-    "error": "bold red",
-    "header": "bold white",
-    "muted": "dim",
-    "accent": "cyan",
-    "bar": "dim cyan",
-})
+console = Console(highlight=False)
 
-console = Console(theme=theme)
-
-LOGO = """[accent]
+LOGO = """\033[36m
  ╦ ╦╔═╗╦═╗╔╦╗╔═╗╔═╗
  ╠═╣║╣ ╠╦╝║║║║╣ ╚═╗
- ╩ ╩╚═╝╩╚═╩ ╩╚═╝╚═╝[/accent] [muted]specialists[/muted]"""
+ ╩ ╩╚═╝╩╚═╩ ╩╚═╝╚═╝\033[0m specialists
+"""
+
+
+def _select(message: str, choices: list, back: bool = True) -> str | None:
+    if back:
+        choices = list(choices) + [Separator(), Choice(BACK, name="← back")]
+    try:
+        result = inquirer.select(
+            message=message,
+            choices=choices,
+            pointer="›",
+            qmark="",
+            amark="",
+            mandatory=False,
+        ).execute()
+    except (KeyboardInterrupt, EOFError):
+        return None
+    return None if result == BACK else result
+
+
+def _fuzzy(message: str, choices: list, back: bool = True) -> str | None:
+    if back:
+        choices = list(choices) + [Choice(BACK, name="← back")]
+    try:
+        result = inquirer.fuzzy(
+            message=message,
+            choices=choices,
+            pointer="›",
+            qmark="",
+            amark="",
+            mandatory=False,
+        ).execute()
+    except (KeyboardInterrupt, EOFError):
+        return None
+    return None if result == BACK else result
+
+
+def _text(message: str, default: str = "") -> str | None:
+    try:
+        return inquirer.text(
+            message=message,
+            default=default,
+            qmark="",
+            amark="",
+            mandatory=False,
+        ).execute()
+    except (KeyboardInterrupt, EOFError):
+        return None
+
+
+def _confirm(message: str, default: bool = False) -> bool:
+    try:
+        return inquirer.confirm(
+            message=message,
+            default=default,
+            qmark="",
+            amark="",
+        ).execute()
+    except (KeyboardInterrupt, EOFError):
+        return False
 
 
 class HermesSpecialistsApp:
-    """Command-driven interface for managing Hermes specialist configs."""
 
     def __init__(self) -> None:
         self.project_root = Path.cwd()
         self.config_path = self.project_root / CONFIG_FILE
         self.config = GlobalConfig.load(self.config_path)
         self.specialists_dir = self.project_root / "specialists"
-        self.running = True
-
-    def _specialist_count(self) -> int:
-        return len(Specialist.discover(self.specialists_dir))
-
-    def _prompt_str(self) -> str:
-        count = self._specialist_count()
-        ep = self.config.default_endpoint.name
-        parts = [f"[bar]│[/bar]"]
-        if count:
-            parts.append(f"[muted]{count} specialist{'s' if count != 1 else ''}[/muted]")
-            parts.append("[bar]·[/bar]")
-        parts.append(f"[muted]{ep}[/muted]")
-        status = " ".join(parts)
-        return f"{status}\n[bar]╰─[/bar][prompt]>[/prompt] "
 
     def run(self) -> None:
-        self._banner()
-        while self.running:
-            try:
-                raw = console.input(self._prompt_str()).strip()
-            except (EOFError, KeyboardInterrupt):
-                console.print()
+        print(LOGO)
+        self._status()
+
+        while True:
+            action = _select("what do you want to do?", [
+                Choice("specialists", name="manage specialists"),
+                Choice("skills", name="manage skills"),
+                Choice("endpoints", name="configure vllm endpoints"),
+                Choice("build", name="build & deploy containers"),
+                Choice("config", name="view configuration"),
+            ], back=False)
+
+            if action is None:
                 break
-            if not raw:
-                continue
-            parts = raw.split()
-            cmd, args = parts[0].lower(), parts[1:]
-            self._dispatch(cmd, args)
 
-    def _banner(self) -> None:
-        width = min(console.width, 56)
-        console.print()
-        console.print(LOGO)
-        console.print()
-        console.print(Panel.fit(
-            "[muted]enterprise & multi-tenant agent serving\n"
-            "configure, build, and deploy specialist hermes agents[/muted]",
-            border_style="dim cyan",
-            padding=(0, 2),
-        ))
-        console.print()
-        console.print("[muted]  type [bold cyan]help[/bold cyan] to get started  "
-                       "[bar]·[/bar]  [bold cyan]quit[/bold cyan] to exit[/muted]")
-        console.print()
+            {
+                "specialists": self._specialists,
+                "skills": self._skills,
+                "endpoints": self._endpoints,
+                "build": self._build,
+                "config": self._show_config,
+            }[action]()
 
-    def _dispatch(self, cmd: str, args: list[str]) -> None:
-        commands = {
-            "help": self._help,
-            "list": self._list,
-            "ls": self._list,
-            "new": self._new,
-            "edit": self._edit,
-            "delete": self._delete,
-            "rm": self._delete,
-            "show": self._show,
-            "endpoints": self._endpoints,
-            "build": self._build,
-            "deploy": self._deploy,
-            "config": self._show_config,
-            "quit": self._quit,
-            "exit": self._quit,
-            "clear": self._clear,
-        }
-        handler = commands.get(cmd)
-        if handler:
-            handler(args)
-        else:
-            console.print(f"  [error]unknown:[/error] {cmd} [muted]— type [bold]help[/bold] for commands[/muted]")
+    def _status(self) -> None:
+        count = len(Specialist.discover(self.specialists_dir))
+        ep = self.config.default_endpoint
+        parts = [f"{count} specialist{'s' if count != 1 else ''}"]
+        parts.append(f"endpoint: {ep.base_url}")
+        if ep.model:
+            parts.append(ep.model)
+        console.print(f"  [dim]{'  ·  '.join(parts)}[/dim]\n")
 
-    def _help(self, args: list[str]) -> None:
-        console.print()
-        console.print("  [header]specialists[/header]")
-        help_section([
-            ("list, ls", "show all specialists"),
-            ("new", "create a new specialist"),
-            ("show [accent]<name>[/accent]", "view specialist details"),
-            ("edit [accent]<name>[/accent]", "modify a specialist"),
-            ("delete [accent]<name>[/accent]", "remove a specialist"),
-        ])
-        console.print("  [header]infrastructure[/header]")
-        help_section([
-            ("endpoints", "list vllm endpoints"),
-            ("endpoints add", "add a new endpoint"),
-            ("endpoints rm [accent]<name>[/accent]", "remove an endpoint"),
-            ("build [accent]<name|all>[/accent]", "build container image"),
-            ("deploy [accent]<name>[/accent]", "deploy to openshift"),
-        ])
-        console.print("  [header]general[/header]")
-        help_section([
-            ("config", "show current configuration"),
-            ("clear", "clear the screen"),
-            ("quit, exit", "exit hermes specialists"),
-        ])
+    # ── specialists ──────────────────────────────────────────────────────
 
-    def _list(self, args: list[str]) -> None:
-        specialists = Specialist.discover(self.specialists_dir)
-        if not specialists:
-            console.print("  [muted]no specialists yet — type [bold]new[/bold] to create one[/muted]")
-            return
-        console.print()
-        for s in specialists:
-            toolset_preview = ", ".join(s.toolsets[:4])
-            if len(s.toolsets) > 4:
-                toolset_preview += f" +{len(s.toolsets) - 4}"
-            console.print(f"  [bold cyan]{s.name}[/bold cyan]")
-            if s.description:
-                console.print(f"    [muted]{s.description}[/muted]")
-            console.print(f"    [muted]endpoint:[/muted] {s.endpoint}  "
-                          f"[muted]model:[/muted] {s.model or '(default)'}  "
-                          f"[muted]tools:[/muted] {toolset_preview}")
-            console.print()
+    def _specialists(self) -> None:
+        while True:
+            specialists = Specialist.discover(self.specialists_dir)
+            if specialists:
+                console.print()
+                for s in specialists:
+                    skills_dir = self.specialists_dir / s.dir_name / "skills"
+                    skill_count = len(list(skills_dir.glob("*/SKILL.md"))) if skills_dir.exists() else 0
+                    console.print(f"  [bold]{s.name}[/bold]  [dim]{s.description}[/dim]")
+                    console.print(f"    [dim]endpoint: {s.endpoint}  ·  {skill_count} skill{'s' if skill_count != 1 else ''}[/dim]")
+                console.print()
 
-    def _new(self, args: list[str]) -> None:
-        console.print()
-        console.print(Rule("[header]new specialist[/header]", style="dim cyan"))
-        console.print()
+            action = _select("specialists", [
+                Choice("new", name="create new"),
+                Choice("edit", name="edit existing"),
+                Choice("delete", name="remove"),
+            ])
+            if action is None:
+                return
+            {"new": self._new_specialist, "edit": self._edit_specialist, "delete": self._delete_specialist}[action]()
 
-        name = Prompt.ask("  [prompt]name[/prompt]", console=console).strip()
+    def _new_specialist(self) -> None:
+        console.print()
+        name = _text("name")
         if not name:
-            console.print("  [error]name is required[/error]")
             return
-        name = name.lower().replace(" ", "-")
+        name = name.strip().lower().replace(" ", "-")
 
-        desc = Prompt.ask("  [prompt]description[/prompt]", default="", console=console).strip()
-        endpoint = Prompt.ask("  [prompt]endpoint[/prompt]", default="default", console=console).strip()
-        model = Prompt.ask("  [prompt]model[/prompt]", default="", console=console).strip()
+        existing = [s.dir_name for s in Specialist.discover(self.specialists_dir)]
+        if name in existing:
+            console.print(f"  [red]specialist '{name}' already exists[/red]")
+            return
 
-        console.print()
-        console.print(f"  [muted]available: {', '.join(HERMES_TOOLSETS)}[/muted]")
-        toolsets_raw = Prompt.ask(
-            "  [prompt]toolsets[/prompt]",
-            default=", ".join(DEFAULT_TOOLSETS),
-            console=console,
-        ).strip()
-        toolsets = [t.strip() for t in toolsets_raw.split(",") if t.strip()]
-
-        console.print()
-        console.print(f"  [muted]presets: {', '.join(BUILTIN_PERSONALITIES.keys())}[/muted]")
-        personality = Prompt.ask("  [prompt]personality[/prompt]", default="(custom)", console=console).strip()
-
-        if personality in BUILTIN_PERSONALITIES:
-            system_prompt = BUILTIN_PERSONALITIES[personality]
-            console.print(f"  [muted]→ using preset: {personality}[/muted]")
-        else:
-            system_prompt = Prompt.ask("  [prompt]system prompt[/prompt]", default="", console=console).strip()
-
-        repos_raw = Prompt.ask("  [prompt]git repos[/prompt]", default="", console=console).strip()
-        repos = [r.strip() for r in repos_raw.split(",") if r.strip()] if repos_raw else []
-
-        context_raw = Prompt.ask("  [prompt]context files[/prompt]", default="", console=console).strip()
-        context_files = [f.strip() for f in context_raw.split(",") if f.strip()] if context_raw else []
+        desc = _text("description") or ""
+        endpoint = _text("endpoint", default="default") or "default"
+        model = _text("model (optional)") or ""
 
         specialist = Specialist(
             name=name,
-            description=desc,
-            model=model,
-            endpoint=endpoint,
-            system_prompt=system_prompt,
-            toolsets=toolsets,
-            repos=repos,
-            context_files=context_files,
+            description=desc.strip(),
+            model=model.strip(),
+            endpoint=endpoint.strip(),
         )
         specialist.save(self.specialists_dir)
-        console.print()
-        console.print(f"  [success]✓ created {name}[/success]")
-        console.print()
 
-    def _show(self, args: list[str]) -> None:
-        if not args:
-            console.print("  [error]usage: show <name>[/error]")
-            return
-        name = args[0]
         specialist_dir = self.specialists_dir / name
-        if not (specialist_dir / "specialist.yaml").exists():
-            console.print(f"  [error]not found: {name}[/error]")
-            return
-        s = Specialist.load(specialist_dir)
-        console.print()
-        console.print(f"  [bold cyan]{s.name}[/bold cyan]")
-        console.print(f"  [muted]{'─' * 40}[/muted]")
-        console.print(f"  [muted]description  [/muted] {s.description or '-'}")
-        console.print(f"  [muted]endpoint     [/muted] {s.endpoint}")
-        console.print(f"  [muted]model        [/muted] {s.model or '(default)'}")
-        console.print(f"  [muted]toolsets     [/muted] {', '.join(s.toolsets)}")
-        if s.system_prompt:
-            preview = s.system_prompt[:80].replace('\n', ' ')
-            console.print(f"  [muted]system prompt [/muted] {preview}{'...' if len(s.system_prompt) > 80 else ''}")
-        if s.repos:
-            console.print(f"  [muted]repos        [/muted] {', '.join(s.repos)}")
-        if s.context_files:
-            console.print(f"  [muted]context      [/muted] {', '.join(s.context_files)}")
-        console.print()
+        (specialist_dir / "skills").mkdir(parents=True, exist_ok=True)
 
-    def _edit(self, args: list[str]) -> None:
-        if not args:
-            console.print("  [error]usage: edit <name>[/error]")
-            return
-        name = args[0]
-        specialist_dir = self.specialists_dir / name
-        if not (specialist_dir / "specialist.yaml").exists():
-            console.print(f"  [error]not found: {name}[/error]")
-            return
-        s = Specialist.load(specialist_dir)
-        console.print()
-        console.print(Rule(f"[header]editing {s.name}[/header]", style="dim cyan"))
-        console.print("  [muted]enter to keep current value[/muted]\n")
+        prompt_file = specialist_dir / "system-prompt.md"
+        if not prompt_file.exists():
+            prompt_file.write_text(
+                f"# {name}\n\n"
+                f"you are a specialist agent for {desc or name}.\n",
+                encoding="utf-8",
+            )
 
-        s.description = Prompt.ask("  [prompt]description[/prompt]", default=s.description, console=console).strip()
-        s.endpoint = Prompt.ask("  [prompt]endpoint[/prompt]", default=s.endpoint, console=console).strip()
-        s.model = Prompt.ask("  [prompt]model[/prompt]", default=s.model, console=console).strip()
+        console.print(f"\n  [green]✓[/green] created {name}")
+        console.print(f"  [dim]system prompt:[/dim]  specialists/{name}/system-prompt.md")
+        console.print(f"  [dim]custom skills:[/dim]  specialists/{name}/skills/\n")
 
-        toolsets_raw = Prompt.ask(
-            "  [prompt]toolsets[/prompt]",
-            default=", ".join(s.toolsets),
-            console=console,
-        ).strip()
-        s.toolsets = [t.strip() for t in toolsets_raw.split(",") if t.strip()]
-
-        s.system_prompt = Prompt.ask(
-            "  [prompt]system prompt[/prompt]",
-            default=s.system_prompt,
-            console=console,
-        ).strip()
-
-        s.save(self.specialists_dir)
-        console.print(f"\n  [success]✓ updated {s.name}[/success]\n")
-
-    def _delete(self, args: list[str]) -> None:
-        if not args:
-            console.print("  [error]usage: delete <name>[/error]")
-            return
-        name = args[0]
-        specialist_dir = self.specialists_dir / name
-        if not specialist_dir.exists():
-            console.print(f"  [error]not found: {name}[/error]")
-            return
-        if Confirm.ask(f"  [warning]delete {name}?[/warning]", console=console):
-            shutil.rmtree(specialist_dir)
-            console.print(f"  [success]✓ deleted {name}[/success]")
-
-    def _endpoints(self, args: list[str]) -> None:
-        if args and args[0] == "add":
-            self._endpoints_add()
-            return
-        if args and args[0] == "rm" and len(args) > 1:
-            self._endpoints_rm(args[1])
-            return
-
-        console.print()
-        ep = self.config.default_endpoint
-        console.print(f"  [bold cyan]{ep.name}[/bold cyan] [muted](default)[/muted]")
-        console.print(f"    [muted]{ep.base_url}[/muted]  "
-                       f"[muted]model:[/muted] {ep.model or '(auto)'}  "
-                       f"[muted]key:[/muted] {ep.api_key_env or '-'}")
-        for ep in self.config.endpoints:
-            console.print()
-            console.print(f"  [bold cyan]{ep.name}[/bold cyan]")
-            console.print(f"    [muted]{ep.base_url}[/muted]  "
-                           f"[muted]model:[/muted] {ep.model or '(auto)'}  "
-                           f"[muted]key:[/muted] {ep.api_key_env or '-'}")
-        console.print()
-        console.print("  [muted][bold]endpoints add[/bold] · [bold]endpoints rm <name>[/bold][/muted]\n")
-
-    def _endpoints_add(self) -> None:
-        console.print()
-        console.print(Rule("[header]add endpoint[/header]", style="dim cyan"))
-        console.print()
-        name = Prompt.ask("  [prompt]name[/prompt]", console=console).strip()
+    def _edit_specialist(self) -> None:
+        name = self._pick_specialist("edit")
         if not name:
             return
-        url = Prompt.ask("  [prompt]base url[/prompt]", default="http://localhost:8000/v1", console=console).strip()
-        key_env = Prompt.ask("  [prompt]api key env var[/prompt]", default="", console=console).strip()
-        model = Prompt.ask("  [prompt]model[/prompt]", default="", console=console).strip()
+        s = Specialist.load(self.specialists_dir / name)
 
-        endpoint = VLLMEndpoint(name=name, base_url=url, api_key_env=key_env, model=model)
-        if name == "default":
-            self.config.default_endpoint = endpoint
-        else:
+        console.print()
+        s.description = _text("description", default=s.description) or s.description
+        s.endpoint = _text("endpoint", default=s.endpoint) or s.endpoint
+        s.model = _text("model", default=s.model) or s.model
+
+        s.save(self.specialists_dir)
+        console.print(f"\n  [green]✓[/green] updated {s.name}")
+        console.print(f"  [dim]system prompt:[/dim]  specialists/{s.dir_name}/system-prompt.md\n")
+
+    def _delete_specialist(self) -> None:
+        name = self._pick_specialist("delete")
+        if not name:
+            return
+        if _confirm(f"delete {name} and all its skills?"):
+            shutil.rmtree(self.specialists_dir / name)
+            console.print(f"  [green]✓[/green] deleted {name}")
+
+    def _pick_specialist(self, action: str) -> str | None:
+        specialists = Specialist.discover(self.specialists_dir)
+        if not specialists:
+            console.print("  [dim]no specialists yet[/dim]")
+            return None
+        choices = [Choice(s.dir_name, name=f"{s.name}  {s.description}") for s in specialists]
+        return _fuzzy(f"{action} which?", choices)
+
+    # ── skills ───────────────────────────────────────────────────────────
+
+    def _skills(self) -> None:
+        while True:
+            action = _select("skills", [
+                Choice("import", name="import a SKILL.md"),
+                Choice("view", name="view skills"),
+                Choice("chain", name="set up chaining"),
+            ])
+            if action is None:
+                return
+            {"import": self._import_skill, "view": self._view_skills, "chain": self._chain_skills}[action]()
+
+    def _import_skill(self) -> None:
+        specialist_name = self._pick_specialist("import skill to")
+        if not specialist_name:
+            return
+
+        path = _text("path to SKILL.md")
+        if not path:
+            return
+        p = Path(path.strip()).expanduser()
+        if not p.exists():
+            console.print(f"  [red]file not found: {path}[/red]")
+            return
+        content = p.read_text(encoding="utf-8")
+        default_name = p.parent.name if p.name == "SKILL.md" else p.stem
+        skill_name = _text("skill name", default=default_name)
+        if not skill_name:
+            return
+        skill_name = skill_name.strip().lower().replace(" ", "-")
+
+        skill_dir = self.specialists_dir / specialist_name / "skills" / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+        console.print(f"  [green]✓[/green] imported {skill_name}")
+
+    def _view_skills(self) -> None:
+        specialist_name = self._pick_specialist("view skills for")
+        if not specialist_name:
+            return
+        skill_dirs = self._list_skill_dirs(specialist_name)
+        if not skill_dirs:
+            console.print(f"  [dim]no skills yet — add SKILL.md files to specialists/{specialist_name}/skills/[/dim]")
+            return
+
+        console.print()
+        for skill_dir in skill_dirs:
+            skill_file = skill_dir / "SKILL.md"
+            content = skill_file.read_text(encoding="utf-8")
+            desc = ""
+            if content.startswith("---"):
+                try:
+                    end = content.index("\n---\n", 3)
+                    fm = yaml.safe_load(content[3:end])
+                    desc = fm.get("description", "")
+                except (ValueError, yaml.YAMLError):
+                    pass
+            console.print(f"  [bold]{skill_dir.name}[/bold]  [dim]{desc}[/dim]")
+
+        chain_file = self.specialists_dir / specialist_name / "chain.yaml"
+        if chain_file.exists():
+            chain = yaml.safe_load(chain_file.read_text()) or {}
+            if chain.get("chain"):
+                console.print(f"\n  [dim]chain:[/dim] {' → '.join(chain['chain'])}")
+        console.print()
+
+    def _chain_skills(self) -> None:
+        specialist_name = self._pick_specialist("set up chaining for")
+        if not specialist_name:
+            return
+        skill_dirs = self._list_skill_dirs(specialist_name)
+        if not skill_dirs:
+            console.print(f"  [dim]no skills to chain — add SKILL.md files to specialists/{specialist_name}/skills/ first[/dim]")
+            return
+
+        available = [d.name for d in skill_dirs]
+        console.print()
+        console.print("  [dim]available:[/dim] " + ", ".join(available))
+        console.print("  [dim]enter skill names in execution order, comma-separated[/dim]")
+
+        raw = _text("chain")
+        if not raw:
+            return
+
+        chain = [s.strip() for s in raw.split(",") if s.strip()]
+        invalid = [s for s in chain if s not in available]
+        if invalid:
+            console.print(f"  [red]unknown: {', '.join(invalid)}[/red]")
+            return
+
+        chain_file = self.specialists_dir / specialist_name / "chain.yaml"
+        chain_file.write_text(yaml.dump({"chain": chain}, default_flow_style=False))
+        console.print(f"\n  [green]✓[/green] chain: {' → '.join(chain)}\n")
+
+    def _list_skill_dirs(self, specialist_name: str) -> list[Path]:
+        skills_dir = self.specialists_dir / specialist_name / "skills"
+        if not skills_dir.exists():
+            return []
+        return sorted(d for d in skills_dir.iterdir() if (d / "SKILL.md").exists())
+
+    # ── endpoints ────────────────────────────────────────────────────────
+
+    def _endpoints(self) -> None:
+        while True:
+            ep = self.config.default_endpoint
+            console.print()
+            console.print(f"  [bold]{ep.name}[/bold] [dim](default)[/dim]")
+            console.print(f"    [dim]{ep.base_url}  ·  model: {ep.model or '(auto)'}[/dim]")
+            for ep in self.config.endpoints:
+                console.print(f"  [bold]{ep.name}[/bold]")
+                console.print(f"    [dim]{ep.base_url}  ·  model: {ep.model or '(auto)'}[/dim]")
+            console.print()
+
+            action = _select("endpoints", [
+                Choice("add", name="add new"),
+                Choice("edit", name="edit default"),
+                Choice("remove", name="remove"),
+            ])
+            if action is None:
+                return
+            {"add": self._endpoint_add, "edit": self._endpoint_edit, "remove": self._endpoint_rm}[action]()
+
+    def _endpoint_add(self) -> None:
+        name = _text("name")
+        if not name:
+            return
+        url = _text("base url", default="http://localhost:8000/v1") or "http://localhost:8000/v1"
+        key_env = _text("api key env var (optional)") or ""
+        model = _text("model (optional)") or ""
+
+        endpoint = VLLMEndpoint(name=name.strip(), base_url=url.strip(), api_key_env=key_env.strip(), model=model.strip())
+        self.config.endpoints = [ep for ep in self.config.endpoints if ep.name != name.strip()]
+        self.config.endpoints.append(endpoint)
+        self.config.save(self.config_path)
+        console.print(f"\n  [green]✓[/green] saved: {name.strip()}")
+
+    def _endpoint_edit(self) -> None:
+        ep = self.config.default_endpoint
+        console.print()
+        ep.base_url = (_text("base url", default=ep.base_url) or ep.base_url).strip()
+        ep.api_key_env = (_text("api key env var", default=ep.api_key_env) or ep.api_key_env).strip()
+        ep.model = (_text("model", default=ep.model) or ep.model).strip()
+        self.config.default_endpoint = ep
+        self.config.save(self.config_path)
+        console.print(f"\n  [green]✓[/green] updated default endpoint")
+
+    def _endpoint_rm(self) -> None:
+        if not self.config.endpoints:
+            console.print("  [dim]no extra endpoints to remove[/dim]")
+            return
+        choices = [Choice(ep.name, name=f"{ep.name}  {ep.base_url}") for ep in self.config.endpoints]
+        name = _select("remove which?", choices)
+        if name:
             self.config.endpoints = [ep for ep in self.config.endpoints if ep.name != name]
-            self.config.endpoints.append(endpoint)
+            self.config.save(self.config_path)
+            console.print(f"  [green]✓[/green] removed: {name}")
 
-        self.config.save(self.config_path)
-        console.print(f"\n  [success]✓ saved endpoint: {name}[/success]\n")
+    # ── build & deploy ───────────────────────────────────────────────────
 
-    def _endpoints_rm(self, name: str) -> None:
-        if name == "default":
-            console.print("  [error]can't remove the default endpoint[/error]")
+    def _build(self) -> None:
+        while True:
+            action = _select("build & deploy", [
+                Choice("one", name="build one specialist"),
+                Choice("all", name="build all"),
+                Choice("deploy", name="deploy to openshift"),
+            ])
+            if action is None:
+                return
+            if action == "one":
+                self._build_one()
+            elif action == "all":
+                self._build_all()
+            elif action == "deploy":
+                self._deploy_one()
+
+    def _build_one(self) -> None:
+        name = self._pick_specialist("build")
+        if not name:
             return
-        self.config.endpoints = [ep for ep in self.config.endpoints if ep.name != name]
-        self.config.save(self.config_path)
-        console.print(f"  [success]✓ removed: {name}[/success]")
-
-    def _build(self, args: list[str]) -> None:
-        if not args:
-            console.print("  [error]usage: build <name|all>[/error]")
-            return
-
         from hermes_specialists.builder.container import build_image
+        s = Specialist.load(self.specialists_dir / name)
+        console.print(f"\n  building {s.name}...")
+        ok = build_image(s, self.config, self.project_root, log_callback=lambda m: console.print(f"  {m}"))
+        console.print(f"  [green]✓[/green] built\n" if ok else f"  [red]✗ build failed[/red]\n")
 
-        if args[0] == "all":
-            specialists = Specialist.discover(self.specialists_dir)
-            if not specialists:
-                console.print("  [muted]no specialists to build[/muted]")
-                return
-            for s in specialists:
-                console.print(f"\n  [header]building {s.name}...[/header]")
-                ok = build_image(s, self.config, self.project_root, log_callback=lambda m: console.print(f"  {m}"))
-                status = "[success]✓[/success]" if ok else "[error]✗[/error]"
-                console.print(f"  {status} {s.name}")
-        else:
-            name = args[0]
-            specialist_dir = self.specialists_dir / name
-            if not (specialist_dir / "specialist.yaml").exists():
-                console.print(f"  [error]not found: {name}[/error]")
-                return
-            s = Specialist.load(specialist_dir)
-            console.print(f"\n  [header]building {s.name}...[/header]")
+    def _build_all(self) -> None:
+        from hermes_specialists.builder.container import build_image
+        specialists = Specialist.discover(self.specialists_dir)
+        if not specialists:
+            console.print("  [dim]no specialists to build[/dim]")
+            return
+        for s in specialists:
+            console.print(f"\n  building {s.name}...")
             ok = build_image(s, self.config, self.project_root, log_callback=lambda m: console.print(f"  {m}"))
-            status = "[success]✓ built[/success]" if ok else "[error]✗ failed[/error]"
-            console.print(f"  {status} {s.name}\n")
+            icon = "[green]✓[/green]" if ok else "[red]✗[/red]"
+            console.print(f"  {icon} {s.name}")
+        console.print()
 
-    def _deploy(self, args: list[str]) -> None:
-        if not args:
-            console.print("  [error]usage: deploy <name>[/error]")
+    def _deploy_one(self) -> None:
+        name = self._pick_specialist("deploy")
+        if not name:
             return
-
         from hermes_specialists.builder.deployer import deploy
-
-        name = args[0]
-        specialist_dir = self.specialists_dir / name
-        if not (specialist_dir / "specialist.yaml").exists():
-            console.print(f"  [error]not found: {name}[/error]")
-            return
-        s = Specialist.load(specialist_dir)
-        console.print(f"\n  [header]deploying {s.name}...[/header]")
+        s = Specialist.load(self.specialists_dir / name)
+        console.print(f"\n  deploying {s.name}...")
         ok = deploy(s, self.config, self.project_root, log_callback=lambda m: console.print(f"  {m}"))
-        status = "[success]✓ deployed[/success]" if ok else "[error]✗ deploy failed[/error]"
-        console.print(f"  {status} {s.name}\n")
+        console.print(f"  [green]✓[/green] deployed\n" if ok else f"  [red]✗ deploy failed[/red]\n")
 
-    def _show_config(self, args: list[str]) -> None:
+    # ── config ───────────────────────────────────────────────────────────
+
+    def _show_config(self) -> None:
+        count = len(Specialist.discover(self.specialists_dir))
         console.print()
-        console.print(f"  [muted]config file    [/muted] {self.config_path}")
-        console.print(f"  [muted]specialists    [/muted] {self.specialists_dir}")
-        console.print(f"  [muted]registry       [/muted] {self.config.registry.url}")
-        console.print(f"  [muted]base image     [/muted] {self.config.registry.base_image}")
-        console.print(f"  [muted]endpoint       [/muted] {self.config.default_endpoint.display}")
+        console.print(f"  [dim]specialists[/dim]  {count}")
+        console.print(f"  [dim]config[/dim]       {self.config_path}")
+        console.print(f"  [dim]registry[/dim]     {self.config.registry.url}")
+        console.print(f"  [dim]base image[/dim]   {self.config.registry.base_image}")
+        console.print(f"  [dim]endpoint[/dim]     {self.config.default_endpoint.display}")
         console.print()
-
-    def _clear(self, args: list[str]) -> None:
-        os.system("cls" if os.name == "nt" else "clear")
-        self._banner()
-
-    def _quit(self, args: list[str]) -> None:
-        self.running = False
-
-
-def help_section(rows: list[tuple[str, str]]) -> None:
-    for cmd, desc in rows:
-        console.print(f"    {cmd:<36} [muted]{desc}[/muted]")
-    console.print()
