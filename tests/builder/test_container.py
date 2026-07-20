@@ -45,21 +45,24 @@ class TestGenerateConfig:
 
 
 class TestGenerateContainerfile:
-    def test_renders_base_image(self, sample_specialist, sample_config, templates_dir):
-        result = generate_containerfile(sample_specialist, sample_config, templates_dir)
+    def test_renders_base_image(self, sample_specialist, sample_config, templates_dir, specialists_dir):
+        result = generate_containerfile(sample_specialist, sample_config, templates_dir, specialists_dir)
         assert "FROM quay.io/sawyer/hermes-agent:latest" in result
 
-    def test_skills_section(self, sample_config, templates_dir):
-        s = Specialist(name="bot", skills=["pr-review"])
-        result = generate_containerfile(s, sample_config, templates_dir)
+    def test_skills_section(self, sample_config, templates_dir, specialists_dir):
+        s = Specialist(name="test-bot")
+        skill_dir = specialists_dir / "test-bot" / "skills" / "pr-review"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("# pr-review\n")
+        result = generate_containerfile(s, sample_config, templates_dir, specialists_dir)
         assert "COPY skills/" in result
 
-    def test_no_skills_section(self, sample_specialist, sample_config, templates_dir):
-        result = generate_containerfile(sample_specialist, sample_config, templates_dir)
+    def test_no_skills_section(self, sample_specialist, sample_config, templates_dir, specialists_dir):
+        result = generate_containerfile(sample_specialist, sample_config, templates_dir, specialists_dir)
         assert "COPY skills/" not in result
 
-    def test_copies_config_and_soul(self, sample_specialist, sample_config, templates_dir):
-        result = generate_containerfile(sample_specialist, sample_config, templates_dir)
+    def test_copies_config_and_soul(self, sample_specialist, sample_config, templates_dir, specialists_dir):
+        result = generate_containerfile(sample_specialist, sample_config, templates_dir, specialists_dir)
         assert "COPY config.yaml" in result
         assert "COPY SOUL.md" in result
 

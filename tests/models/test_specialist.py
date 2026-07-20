@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from hermes_specialists.models import Specialist
-from hermes_specialists.models.specialist import DEFAULT_TOOLSETS
 
 
 class TestSpecialistDirName:
@@ -43,15 +42,6 @@ class TestSpecialistSaveLoad:
         sample_specialist.save(tmp_path)
         assert (tmp_path / sample_specialist.dir_name / "specialist.yaml").exists()
 
-    def test_default_toolsets(self):
-        s = Specialist(name="a")
-        assert s.toolsets == list(DEFAULT_TOOLSETS)
-
-    def test_toolsets_not_shared(self):
-        a = Specialist(name="a")
-        b = Specialist(name="b")
-        a.toolsets.append("extra")
-        assert "extra" not in b.toolsets
 
 
 class TestSpecialistDiscover:

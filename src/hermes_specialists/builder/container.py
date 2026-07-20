@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -65,7 +66,9 @@ def generate_config(specialist: Specialist, config: GlobalConfig) -> dict:
     return hermes_config
 
 
-def generate_containerfile(specialist: Specialist, config: GlobalConfig, templates_dir: Path) -> str:
+def generate_containerfile(
+    specialist: Specialist, config: GlobalConfig, templates_dir: Path, specialists_dir: Path,
+) -> str:
     """Render a Containerfile from the template for a specialist."""
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
     template = env.get_template("Containerfile.template")
@@ -73,8 +76,8 @@ def generate_containerfile(specialist: Specialist, config: GlobalConfig, templat
     return template.render(
         base_image=config.registry.base_image,
         specialist_name=specialist.dir_name,
-        skills=bool(specialist.skills),
-        context_files=bool(specialist.context_files),
+        skills=specialist.has_skills(specialists_dir),
+        context_files=specialist.has_context(specialists_dir),
     )
 
 
@@ -93,8 +96,22 @@ def prepare_build_context(specialist: Specialist, config: GlobalConfig, output_d
     system_prompt = specialist.system_prompt(specialists_dir)
     (build_dir / "SOUL.md").write_text(system_prompt or f"You are {specialist.name}.\n")
 
+    if specialist.has_skills(specialists_dir):
+        skills_src = specialists_dir / specialist.dir_name / "skills"
+        skills_dst = build_dir / "skills"
+        if skills_dst.exists():
+            shutil.rmtree(skills_dst)
+        shutil.copytree(skills_src, skills_dst)
+
+    if specialist.has_context(specialists_dir):
+        context_src = specialists_dir / specialist.dir_name / "context"
+        context_dst = build_dir / "context"
+        if context_dst.exists():
+            shutil.rmtree(context_dst)
+        shutil.copytree(context_src, context_dst)
+
     containerfile_content = generate_containerfile(
-        specialist, config, output_dir.parent / "templates"
+        specialist, config, output_dir.parent / "templates", specialists_dir,
     )
     (build_dir / "Containerfile").write_text(containerfile_content)
 

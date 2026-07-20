@@ -3,31 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
-
-HERMES_TOOLSETS = [
-    "web",
-    "search",
-    "terminal",
-    "file",
-    "browser",
-    "vision",
-    "image_gen",
-    "skills",
-    "skills_hub",
-    "todo",
-    "tts",
-    "cronjob",
-]
-
-DEFAULT_TOOLSETS = ["terminal", "file", "web", "skills", "todo"]
-
-BUILTIN_PERSONALITIES = {
-    "helpful": "You are a helpful, friendly AI assistant.",
-    "concise": "You are a concise assistant. Keep responses brief and to the point.",
-    "technical": "You are a technical expert. Provide detailed, accurate technical information.",
-}
-
+from pydantic import BaseModel
 
 class Specialist(BaseModel):
     """A single specialist agent configuration."""
@@ -36,11 +12,6 @@ class Specialist(BaseModel):
     description: str = ""
     model: str = ""
     endpoint: str = "default"
-    personality: str = ""
-    toolsets: list[str] = Field(default_factory=lambda: list(DEFAULT_TOOLSETS))
-    skills: list[str] = Field(default_factory=list)
-    context_files: list[str] = Field(default_factory=list)
-    repos: list[str] = Field(default_factory=list)
 
     @property
     def dir_name(self) -> str:
@@ -51,6 +22,16 @@ class Specialist(BaseModel):
         if prompt_file.exists():
             return prompt_file.read_text(encoding="utf-8").strip()
         return ""
+
+    def has_skills(self, base_dir: Path) -> bool:
+        skills_dir = base_dir / self.dir_name / "skills"
+        if not skills_dir.exists():
+            return False
+        return any((d / "SKILL.md").exists() for d in skills_dir.iterdir() if d.is_dir())
+
+    def has_context(self, base_dir: Path) -> bool:
+        context_dir = base_dir / self.dir_name / "context"
+        return context_dir.exists() and any(context_dir.iterdir())
 
     def save(self, base_dir: Path) -> None:
         specialist_dir = base_dir / self.dir_name
