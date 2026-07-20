@@ -32,6 +32,13 @@ spec:
         app: hermes-specialist
         specialist: {{ specialist_name }}
     spec:
+      initContainers:
+        - name: init-config
+          image: {{ registry }}/{{ specialist_name }}:{{ tag | default("latest") }}
+          command: ["/bin/sh", "-c", "cp -r /opt/hermes-init/. /opt/hermes/"]
+          volumeMounts:
+            - name: specialist-data
+              mountPath: /opt/hermes
       containers:
         - name: {{ specialist_name }}
           image: {{ registry }}/{{ specialist_name }}:{{ tag | default("latest") }}

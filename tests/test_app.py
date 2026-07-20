@@ -212,7 +212,7 @@ class TestEndpointAdd:
         ep = config.get_endpoint("staging")
         assert ep is not None
         assert ep.base_url == "http://staging:8000/v1"
-        assert ep.api_key_env == "STAGING_KEY"
+        assert ep.api_key == "STAGING_KEY"
         assert ep.model == "llama-70b"
 
     @patch(f"{MODULE}._text")
@@ -237,7 +237,7 @@ class TestEndpointEdit:
 
         config = GlobalConfig.load(project_dir / "config.yaml")
         assert config.default_endpoint.base_url == "http://new:9000/v1"
-        assert config.default_endpoint.api_key_env == "MY_KEY"
+        assert config.default_endpoint.api_key == "MY_KEY"
         assert config.default_endpoint.model == "gpt-4"
 
 
@@ -446,7 +446,6 @@ class TestFullFlow:
             "specialists",
             "new",
             "delete",
-            None,
             None,
         ]
         mock_text.side_effect = ["temp-bot", "temporary", "default", ""]

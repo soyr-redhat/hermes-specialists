@@ -37,7 +37,7 @@ class TestGenerateConfig:
     def test_api_key_included(self, sample_config):
         s = Specialist(name="test-bot", endpoint="staging")
         cfg = generate_config(s, sample_config)
-        assert cfg["model"]["api_key"] == "${STAGING_KEY}"
+        assert cfg["model"]["api_key"] == "STAGING_KEY"
 
     def test_no_api_key_when_empty(self, sample_specialist, sample_config):
         cfg = generate_config(sample_specialist, sample_config)

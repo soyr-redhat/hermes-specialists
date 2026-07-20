@@ -11,7 +11,7 @@ class VLLMEndpoint(BaseModel):
 
     name: str = "default"
     base_url: str = "http://localhost:8000/v1"
-    api_key_env: str = ""
+    api_key: str = ""
     model: str = ""
 
     @property

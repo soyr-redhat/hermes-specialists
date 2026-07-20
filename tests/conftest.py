@@ -33,7 +33,7 @@ def sample_config() -> GlobalConfig:
             VLLMEndpoint(
                 name="staging",
                 base_url="http://staging:8000/v1",
-                api_key_env="STAGING_KEY",
+                api_key="STAGING_KEY",
                 model="llama-70b",
             ),
         ],

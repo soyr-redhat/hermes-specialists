@@ -58,9 +58,9 @@ def generate_config(specialist: Specialist, config: GlobalConfig) -> dict:
         },
     }
 
-    if endpoint.api_key_env:
-        hermes_config["model"]["api_key"] = f"${{{endpoint.api_key_env}}}"
-        hermes_config["custom_providers"][0]["api_key"] = f"${{{endpoint.api_key_env}}}"
+    if endpoint.api_key:
+        hermes_config["model"]["api_key"] = endpoint.api_key
+        hermes_config["custom_providers"][0]["api_key"] = endpoint.api_key
 
     return hermes_config
 

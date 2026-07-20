@@ -187,7 +187,11 @@ class HermesSpecialistsApp:
             ])
             if action is None:
                 return
-            {"new": self._new_specialist, "edit": self._edit_specialist, "delete": self._delete_specialist}[action]()
+            if action == "delete":
+                if self._delete_specialist():
+                    return
+            else:
+                {"new": self._new_specialist, "edit": self._edit_specialist}[action]()
 
     def _new_specialist(self) -> None:
         console.print()
@@ -202,14 +206,26 @@ class HermesSpecialistsApp:
             return
 
         desc = _text("description") or ""
-        endpoint = _text("endpoint", default="default") or "default"
-        model = _text("model (optional)") or ""
+        endpoint_name = (_text("endpoint", default="default") or "default").strip()
+
+        ep = self.config.get_endpoint(endpoint_name)
+        if not ep:
+            console.print(f"  [dim]endpoint '{endpoint_name}' not found, setting it up[/dim]")
+            url = (_text("base url", default="http://localhost:8000/v1") or "http://localhost:8000/v1").strip()
+            api_key = (_text("api key (optional)") or "").strip()
+            model = (_text("model") or "").strip()
+            new_ep = VLLMEndpoint(name=endpoint_name, base_url=url, api_key=api_key, model=model)
+            self.config.endpoints = [e for e in self.config.endpoints if e.name != endpoint_name]
+            self.config.endpoints.append(new_ep)
+            self.config.save(self.config_path)
+        else:
+            model = (_text("model (optional)", default=ep.model) or "").strip()
 
         specialist = Specialist(
             name=name,
             description=desc.strip(),
-            model=model.strip(),
-            endpoint=endpoint.strip(),
+            model=model,
+            endpoint=endpoint_name,
         )
         specialist.save(self.specialists_dir)
 
@@ -243,13 +259,15 @@ class HermesSpecialistsApp:
         console.print(f"\n  [green]✓[/green] updated [bold]{s.name}[/bold]")
         console.print(f"  [dim]system prompt:[/dim]  specialists/{s.dir_name}/system-prompt.md\n")
 
-    def _delete_specialist(self) -> None:
+    def _delete_specialist(self) -> bool:
         name = self._pick_specialist("delete")
         if not name:
-            return
+            return False
         if _confirm(f"delete {name} and all its skills?"):
             shutil.rmtree(self.specialists_dir / name)
             console.print(f"  [green]✓[/green] deleted {name}")
+            return True
+        return False
 
     def _pick_specialist(self, action: str) -> str | None:
         specialists = Specialist.discover(self.specialists_dir)
@@ -387,10 +405,10 @@ class HermesSpecialistsApp:
         if not name:
             return
         url = _text("base url", default="http://localhost:8000/v1") or "http://localhost:8000/v1"
-        key_env = _text("api key env var (optional)") or ""
+        key_env = _text("api key (optional)") or ""
         model = _text("model (optional)") or ""
 
-        endpoint = VLLMEndpoint(name=name.strip(), base_url=url.strip(), api_key_env=key_env.strip(), model=model.strip())
+        endpoint = VLLMEndpoint(name=name.strip(), base_url=url.strip(), api_key=key_env.strip(), model=model.strip())
         self.config.endpoints = [ep for ep in self.config.endpoints if ep.name != name.strip()]
         self.config.endpoints.append(endpoint)
         self.config.save(self.config_path)
@@ -400,7 +418,7 @@ class HermesSpecialistsApp:
         ep = self.config.default_endpoint
         console.print()
         ep.base_url = (_text("base url", default=ep.base_url) or ep.base_url).strip()
-        ep.api_key_env = (_text("api key env var", default=ep.api_key_env) or ep.api_key_env).strip()
+        ep.api_key = (_text("api key", default=ep.api_key) or ep.api_key).strip()
         ep.model = (_text("model", default=ep.model) or ep.model).strip()
         self.config.default_endpoint = ep
         self.config.save(self.config_path)

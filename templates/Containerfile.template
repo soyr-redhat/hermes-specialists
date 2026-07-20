@@ -3,15 +3,15 @@ FROM {{ base_image }}
 ARG SPECIALIST={{ specialist_name }}
 ENV HERMES_SPECIALIST=${SPECIALIST}
 
-COPY config.yaml ${HERMES_HOME}/config.yaml
-COPY SOUL.md ${HERMES_HOME}/SOUL.md
+COPY config.yaml /opt/hermes-init/config.yaml
+COPY SOUL.md /opt/hermes-init/SOUL.md
 
 {% if skills %}
-COPY skills/ ${HERMES_HOME}/skills/{{ specialist_name }}/
+COPY skills/ /opt/hermes-init/skills/{{ specialist_name }}/
 {% endif %}
 
 {% if context_files %}
-COPY context/ ${HERMES_HOME}/context/
+COPY context/ /opt/hermes-init/context/
 {% endif %}
 
 WORKDIR ${HERMES_HOME}
