@@ -25,7 +25,7 @@ class VLLMEndpoint(BaseModel):
 class RegistryConfig(BaseModel):
     """Container registry settings."""
 
-    url: str = "quay.io/sawyer"
+    url: str = ""
     repo: str = "hermes-specialists"
     namespace: str = ""
     base_image: str = "quay.io/sawyer/hermes-agent:latest"

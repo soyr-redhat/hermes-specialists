@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_specialists.models import GlobalConfig, Specialist, VLLMEndpoint
+from hermes_specialists.models import GlobalConfig, RegistryConfig, Specialist, VLLMEndpoint
 
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -37,6 +37,7 @@ def sample_config() -> GlobalConfig:
                 model="llama-70b",
             ),
         ],
+        registry=RegistryConfig(url="quay.io/sawyer"),
     )
 
 
