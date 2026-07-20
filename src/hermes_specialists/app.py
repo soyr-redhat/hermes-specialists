@@ -570,10 +570,6 @@ class HermesSpecialistsApp:
   [dim]not logged in?[/dim]
     oc login <cluster-url> --token=<token>
 
-  [dim]can't find oc?[/dim]
-    download from your cluster's command line tools page
-    add to PATH:  setx PATH "%PATH%;C:\\path\\to\\oc"
-
   [dim]ErrImagePull?[/dim]
     make sure the quay.io repo is set to public
     check:  oc describe pod <name> | grep -A5 Events
@@ -593,6 +589,8 @@ class HermesSpecialistsApp:
   [dim]podman not found?[/dim]
     install:  winget install RedHat.Podman  (windows)
               brew install podman           (mac)
+              sudo dnf install podman       (fedora/rhel)
+              sudo apt install podman       (ubuntu/debian)
 
   [dim]podman machine not running?[/dim]
     podman machine init    (first time only)
