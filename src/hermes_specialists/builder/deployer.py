@@ -17,8 +17,7 @@ def generate_deployment(specialist: Specialist, config: GlobalConfig, templates_
 
     return template.render(
         specialist_name=specialist.dir_name,
-        registry=config.registry.url,
-        tag="latest",
+        image=config.registry.image_ref(specialist.dir_name),
     )
 
 

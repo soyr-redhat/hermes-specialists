@@ -4,7 +4,17 @@ from pathlib import Path
 
 import yaml
 
-from hermes_specialists.models import GlobalConfig, VLLMEndpoint
+from hermes_specialists.models import GlobalConfig, RegistryConfig, VLLMEndpoint
+
+
+class TestRegistryConfig:
+    def test_image_ref_no_namespace(self):
+        reg = RegistryConfig(url="quay.io/sawyer", repo="hermes-specialists")
+        assert reg.image_ref("poet") == "quay.io/sawyer/hermes-specialists:poet"
+
+    def test_image_ref_with_namespace(self):
+        reg = RegistryConfig(url="quay.io/sawyer", repo="hermes-specialists", namespace="sawyer")
+        assert reg.image_ref("poet") == "quay.io/sawyer/hermes-specialists:sawyer-poet"
 
 
 class TestVLLMEndpoint:

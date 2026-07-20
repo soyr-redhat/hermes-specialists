@@ -26,7 +26,13 @@ class RegistryConfig(BaseModel):
     """Container registry settings."""
 
     url: str = "quay.io/sawyer"
+    repo: str = "hermes-specialists"
+    namespace: str = ""
     base_image: str = "quay.io/sawyer/hermes-agent:latest"
+
+    def image_ref(self, specialist_dir_name: str) -> str:
+        tag = f"{self.namespace}-{specialist_dir_name}" if self.namespace else specialist_dir_name
+        return f"{self.url}/{self.repo}:{tag}"
 
 
 class GlobalConfig(BaseModel):

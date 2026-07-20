@@ -34,14 +34,14 @@ spec:
     spec:
       initContainers:
         - name: init-config
-          image: {{ registry }}/{{ specialist_name }}:{{ tag | default("latest") }}
+          image: {{ image }}
           command: ["/bin/sh", "-c", "cp -r /opt/hermes-init/. /opt/hermes/"]
           volumeMounts:
             - name: specialist-data
               mountPath: /opt/hermes
       containers:
         - name: {{ specialist_name }}
-          image: {{ registry }}/{{ specialist_name }}:{{ tag | default("latest") }}
+          image: {{ image }}
           command: ["/bin/sh", "-c", "echo '{{ specialist_name }} ready'; exec sleep infinity"]
           resources:
             requests:

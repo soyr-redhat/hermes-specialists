@@ -129,7 +129,7 @@ def build_image(
         specialist, config, project_root / ".build"
     )
 
-    tag = f"{config.registry.url}/{specialist.dir_name}:latest"
+    tag = config.registry.image_ref(specialist.dir_name)
     cmd = ["podman", "build", "-t", tag, "-f", "Containerfile", "."]
 
     if log_callback:
@@ -160,7 +160,7 @@ def push_image(
     log_callback=None,
 ) -> bool:
     """Push a specialist's container image to the registry."""
-    tag = f"{config.registry.url}/{specialist.dir_name}:latest"
+    tag = config.registry.image_ref(specialist.dir_name)
     cmd = ["podman", "push", tag]
 
     if log_callback:

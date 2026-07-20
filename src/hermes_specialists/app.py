@@ -545,7 +545,9 @@ class HermesSpecialistsApp:
         console.print()
         console.print(f"  [dim]specialists[/dim]  {count}")
         console.print(f"  [dim]config[/dim]       {self.config_path}")
-        console.print(f"  [dim]registry[/dim]     {self.config.registry.url}")
+        console.print(f"  [dim]registry[/dim]     {self.config.registry.url}/{self.config.registry.repo}")
+        if self.config.registry.namespace:
+            console.print(f"  [dim]namespace[/dim]    {self.config.registry.namespace}")
         console.print(f"  [dim]base image[/dim]   {self.config.registry.base_image}")
         console.print(f"  [dim]endpoint[/dim]     {self.config.default_endpoint.display}")
         console.print()

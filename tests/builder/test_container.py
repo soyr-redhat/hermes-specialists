@@ -150,7 +150,7 @@ class TestPushImage:
         cmd = mock_stream.call_args[0][0]
         assert cmd[0] == "podman"
         assert cmd[1] == "push"
-        assert "quay.io/sawyer/test-bot:latest" in cmd[2]
+        assert "quay.io/sawyer/hermes-specialists:test-bot" in cmd[2]
 
     @patch("hermes_specialists.builder.container._run_streaming")
     def test_failure(self, mock_stream, sample_specialist, sample_config):
