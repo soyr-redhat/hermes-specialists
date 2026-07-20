@@ -35,6 +35,7 @@ spec:
       initContainers:
         - name: init-config
           image: {{ image }}
+          imagePullPolicy: Always
           command: ["/bin/sh", "-c", "cp -r /opt/hermes-init/. /opt/hermes/"]
           volumeMounts:
             - name: specialist-data
@@ -42,6 +43,7 @@ spec:
       containers:
         - name: {{ specialist_name }}
           image: {{ image }}
+          imagePullPolicy: Always
           command: ["/bin/sh", "-c", "echo '{{ specialist_name }} ready'; exec sleep infinity"]
           resources:
             requests:
