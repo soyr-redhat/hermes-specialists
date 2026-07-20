@@ -65,7 +65,7 @@ def _sep() -> None:
 
 def _select(message: str, choices: list, back: bool = True) -> str | None:
     if back:
-        choices = list(choices) + [Separator(), Choice(BACK, name="← back")]
+        choices = list(choices) + [Separator(), Choice(BACK, name="<- back")]
     _sep()
     try:
         result = inquirer.select(
@@ -349,7 +349,7 @@ class HermesSpecialistsApp:
         if chain_file.exists():
             chain = yaml.safe_load(chain_file.read_text()) or {}
             if chain.get("chain"):
-                console.print(f"\n  [dim]chain:[/dim] {' → '.join(chain['chain'])}")
+                console.print(f"\n  [dim]chain:[/dim] {' ->'.join(chain['chain'])}")
         console.print()
 
     def _chain_skills(self) -> None:
@@ -378,7 +378,7 @@ class HermesSpecialistsApp:
 
         chain_file = self.specialists_dir / specialist_name / "chain.yaml"
         chain_file.write_text(yaml.dump({"chain": chain}, default_flow_style=False))
-        console.print(f"\n  [green]✓[/green] chain: {' → '.join(chain)}\n")
+        console.print(f"\n  [green]✓[/green] chain: {' ->'.join(chain)}\n")
 
     def _list_skill_dirs(self, specialist_name: str) -> list[Path]:
         skills_dir = self.specialists_dir / specialist_name / "skills"
