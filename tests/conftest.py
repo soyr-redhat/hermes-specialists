@@ -73,4 +73,6 @@ def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def app(project_dir: Path):
     """Return a HermesSpecialistsApp instance rooted in the project_dir."""
     from hermes_specialists.app import HermesSpecialistsApp
+    config = GlobalConfig()
+    config.save(project_dir / "config.yaml")
     return HermesSpecialistsApp()

@@ -136,6 +136,8 @@ class HermesSpecialistsApp:
 
     def run(self) -> None:
         print(BANNER)
+        if not self.config_path.exists():
+            self._first_run()
         self._status()
 
         while True:
@@ -169,6 +171,26 @@ class HermesSpecialistsApp:
         if ep.model:
             parts.append(ep.model)
         console.print(f"  [dim]{'  ·  '.join(parts)}[/dim]\n")
+
+    def _first_run(self) -> None:
+        console.print("  [bold]first time setup[/bold]\n")
+
+        console.print("  [dim]configure your vllm endpoint[/dim]")
+        url = (_text("base url", default="http://localhost:8000/v1") or "http://localhost:8000/v1").strip()
+        api_key = (_text("api key (optional)") or "").strip()
+        model = (_text("model") or "").strip()
+        self.config.default_endpoint = VLLMEndpoint(name="default", base_url=url, api_key=api_key, model=model)
+
+        console.print("\n  [dim]configure your container registry[/dim]")
+        reg_url = (_text("registry url", default="quay.io/username") or "quay.io/username").strip()
+        repo = (_text("repo", default="hermes-specialists") or "hermes-specialists").strip()
+        namespace = (_text("namespace (optional, prevents tag collisions)") or "").strip()
+        self.config.registry.url = reg_url
+        self.config.registry.repo = repo
+        self.config.registry.namespace = namespace
+
+        self.config.save(self.config_path)
+        console.print(f"\n  [green]✓[/green] saved to {CONFIG_FILE}\n")
 
     # ── specialists ──────────────────────────────────────────────────────
 

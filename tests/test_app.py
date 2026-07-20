@@ -344,6 +344,46 @@ class TestDeployOne:
         app._deploy_one()
 
 
+# ── first run ──────────────────────────────────────────────────────────
+
+
+class TestFirstRun:
+    @patch(f"{MODULE}._text")
+    def test_creates_config(self, mock_text, app, project_dir):
+        app.config_path.unlink(missing_ok=True)
+        mock_text.side_effect = [
+            "http://myhost:8000/v1", "sk-123", "gemma4",
+            "quay.io/alice", "my-repo", "alice",
+        ]
+        app._first_run()
+        assert app.config_path.exists()
+        assert app.config.default_endpoint.base_url == "http://myhost:8000/v1"
+        assert app.config.default_endpoint.api_key == "sk-123"
+        assert app.config.registry.url == "quay.io/alice"
+        assert app.config.registry.namespace == "alice"
+
+    @patch(f"{MODULE}._text")
+    @patch(f"{MODULE}._select")
+    def test_triggers_on_missing_config(self, mock_select, mock_text, project_dir):
+        config_path = project_dir / "config.yaml"
+        config_path.unlink(missing_ok=True)
+        from hermes_specialists.app import HermesSpecialistsApp
+        app = HermesSpecialistsApp()
+        mock_text.side_effect = [
+            "http://host:8000/v1", "", "model1",
+            "quay.io/user", "repo", "",
+        ]
+        mock_select.return_value = None
+        app.run()
+        assert config_path.exists()
+
+    @patch(f"{MODULE}._select")
+    def test_skips_when_config_exists(self, mock_select, app, project_dir):
+        app.config.save(app.config_path)
+        mock_select.return_value = None
+        app.run()
+
+
 # ── config view ─────────────────────────────────────────────────────────
 
 
