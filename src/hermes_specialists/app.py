@@ -182,7 +182,7 @@ class HermesSpecialistsApp:
         self.config.default_endpoint = VLLMEndpoint(name="default", base_url=url, api_key=api_key, model=model)
 
         console.print("\n  [dim]configure your container registry[/dim]")
-        reg_url = (_text("registry url", default="quay.io/username") or "quay.io/username").strip()
+        reg_url = (_text("registry url", default="quay.io/sawyer") or "quay.io/sawyer").strip()
         repo = (_text("repo", default="hermes-specialists") or "hermes-specialists").strip()
         namespace = (_text("namespace (optional, prevents tag collisions)") or "").strip()
         self.config.registry.url = reg_url
