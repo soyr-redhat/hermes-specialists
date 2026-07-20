@@ -35,17 +35,32 @@ def _run_streaming(cmd, log_callback=None, cwd=None, timeout=600):
 def generate_config(specialist: Specialist, config: GlobalConfig) -> dict:
     """Generate a Hermes config.yaml for a specialist."""
     endpoint = config.get_endpoint(specialist.endpoint) or config.default_endpoint
+    model = specialist.model or endpoint.model or ""
 
     hermes_config: dict = {
         "model": {
-            "default": specialist.model or endpoint.model or "",
+            "default": model,
             "provider": "custom",
             "base_url": endpoint.base_url,
+        },
+        "_config_version": 33,
+        "custom_providers": [
+            {
+                "name": endpoint.name,
+                "base_url": endpoint.base_url,
+                "model": model,
+            },
+        ],
+        "onboarding": {
+            "seen": {
+                "busy_input_prompt": True,
+            },
         },
     }
 
     if endpoint.api_key_env:
         hermes_config["model"]["api_key"] = f"${{{endpoint.api_key_env}}}"
+        hermes_config["custom_providers"][0]["api_key"] = f"${{{endpoint.api_key_env}}}"
 
     return hermes_config
 
