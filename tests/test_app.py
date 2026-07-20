@@ -355,6 +355,23 @@ class TestShowConfig:
         Specialist(name="bot").save(project_dir / "specialists")
         app._show_config()
 
+    @patch(f"{MODULE}._text")
+    def test_edit_registry(self, mock_text, app, project_dir):
+        mock_text.side_effect = ["quay.io/other", "my-repo", "alice", "quay.io/other/base:latest"]
+        app._edit_registry()
+        assert app.config.registry.url == "quay.io/other"
+        assert app.config.registry.repo == "my-repo"
+        assert app.config.registry.namespace == "alice"
+        assert app.config.registry.base_image == "quay.io/other/base:latest"
+
+    @patch(f"{MODULE}._text")
+    @patch(f"{MODULE}._select")
+    def test_config_edit_registry_flow(self, mock_select, mock_text, app, project_dir):
+        mock_select.side_effect = ["registry", None]
+        mock_text.side_effect = ["quay.io/test", "repo", "ns", "quay.io/test/img:v1"]
+        app._config()
+        assert app.config.registry.url == "quay.io/test"
+
 
 # ── navigation ──────────────────────────────────────────────────────────
 
@@ -382,8 +399,13 @@ class TestNavigation:
 
     @patch(f"{MODULE}._select")
     def test_config_from_main_menu(self, mock_select, app, project_dir):
-        mock_select.side_effect = ["config", None]
+        mock_select.side_effect = ["config", None, None]
         app.run()
+
+    @patch(f"{MODULE}._select")
+    def test_config_back(self, mock_select, app):
+        mock_select.return_value = None
+        app._config()
 
     @patch(f"{MODULE}._select")
     def test_specialists_flow_from_main_menu(self, mock_select, app, project_dir):

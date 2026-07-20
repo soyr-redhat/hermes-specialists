@@ -157,7 +157,7 @@ class HermesSpecialistsApp:
                 "skills": self._skills,
                 "endpoints": self._endpoints,
                 "build": self._build,
-                "config": self._show_config,
+                "config": self._config,
                 "help": self._help,
             }[action]()
 
@@ -551,6 +551,31 @@ class HermesSpecialistsApp:
         console.print(f"  [dim]base image[/dim]   {self.config.registry.base_image}")
         console.print(f"  [dim]endpoint[/dim]     {self.config.default_endpoint.display}")
         console.print()
+
+    def _config(self) -> None:
+        while True:
+            self._show_config()
+            action = _select("configuration", [
+                Choice("registry", name="edit registry"),
+                Choice("endpoint", name="edit default endpoint"),
+            ])
+            if action is None:
+                return
+            if action == "registry":
+                self._edit_registry()
+            elif action == "endpoint":
+                self._endpoint_edit()
+
+    def _edit_registry(self) -> None:
+        reg = self.config.registry
+        console.print()
+        reg.url = (_text("registry url", default=reg.url) or reg.url).strip()
+        reg.repo = (_text("repo", default=reg.repo) or reg.repo).strip()
+        reg.namespace = (_text("namespace (optional)", default=reg.namespace) or "").strip()
+        reg.base_image = (_text("base image", default=reg.base_image) or reg.base_image).strip()
+        self.config.registry = reg
+        self.config.save(self.config_path)
+        console.print(f"\n  [green]✓[/green] updated registry")
 
     # ── help ────────────────────────────────────────────────────────────
 
