@@ -63,6 +63,9 @@ def _sep() -> None:
     console.print(f"  [dim]{'─' * 40}[/dim]")
 
 
+ESC_SKIP = {"skip": [{"key": "escape"}]}
+
+
 def _select(message: str, choices: list, back: bool = True) -> str | None:
     if back:
         choices = list(choices) + [Separator(), Choice(BACK, name="← back")]
@@ -76,6 +79,7 @@ def _select(message: str, choices: list, back: bool = True) -> str | None:
             amark="▸",
             style=STYLE,
             mandatory=False,
+            keybindings=ESC_SKIP,
         ).execute()
     except (KeyboardInterrupt, EOFError):
         return None
@@ -93,6 +97,7 @@ def _fuzzy(message: str, choices: list) -> str | None:
             amark="▸",
             style=STYLE,
             mandatory=False,
+            keybindings=ESC_SKIP,
         ).execute()
     except (KeyboardInterrupt, EOFError):
         return None
@@ -107,6 +112,7 @@ def _text(message: str, default: str = "") -> str | None:
             amark="▸",
             style=STYLE,
             mandatory=False,
+            keybindings=ESC_SKIP,
         ).execute()
     except (KeyboardInterrupt, EOFError):
         return None
