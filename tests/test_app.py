@@ -22,7 +22,7 @@ MODULE = "hermes_specialists.app"
 class TestCreateSpecialist:
     @patch(f"{MODULE}._text")
     def test_creates_specialist(self, mock_text, app, project_dir):
-        mock_text.side_effect = ["my-bot", "a helpful bot", "default", "llama-70b"]
+        mock_text.side_effect = ["my-bot", "a helpful bot", "default", "llama-70b", ""]
         app._new_specialist()
 
         spec_dir = project_dir / "specialists" / "my-bot"
@@ -37,7 +37,7 @@ class TestCreateSpecialist:
 
     @patch(f"{MODULE}._text")
     def test_creates_system_prompt_scaffold(self, mock_text, app, project_dir):
-        mock_text.side_effect = ["helper", "does stuff", "default", ""]
+        mock_text.side_effect = ["helper", "does stuff", "default", "", ""]
         app._new_specialist()
 
         content = (project_dir / "specialists" / "helper" / "system-prompt.md").read_text()
@@ -54,7 +54,7 @@ class TestCreateSpecialist:
 
     @patch(f"{MODULE}._text")
     def test_normalizes_name(self, mock_text, app, project_dir):
-        mock_text.side_effect = ["  My Cool Bot  ", "desc", "default", ""]
+        mock_text.side_effect = ["  My Cool Bot  ", "desc", "default", "", ""]
         app._new_specialist()
         assert (project_dir / "specialists" / "my-cool-bot" / "specialist.yaml").exists()
 
@@ -419,6 +419,7 @@ class TestFullFlow:
             "handles deploys",
             "default",
             "llama-70b",
+            "",
         ]
         mock_fuzzy.side_effect = ["deploy-bot"]
 
@@ -448,7 +449,7 @@ class TestFullFlow:
             "delete",
             None,
         ]
-        mock_text.side_effect = ["temp-bot", "temporary", "default", ""]
+        mock_text.side_effect = ["temp-bot", "temporary", "default", "", ""]
         mock_fuzzy.side_effect = ["temp-bot"]
         mock_confirm.return_value = True
 

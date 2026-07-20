@@ -206,7 +206,7 @@ class HermesSpecialistsApp:
             return
 
         desc = _text("description") or ""
-        endpoint_name = (_text("endpoint", default="default") or "default").strip()
+        endpoint_name = (_text("endpoint (leave blank for default)") or "default").strip()
 
         ep = self.config.get_endpoint(endpoint_name)
         if not ep:
@@ -220,6 +220,10 @@ class HermesSpecialistsApp:
             self.config.save(self.config_path)
         else:
             model = (_text("model (optional)", default=ep.model) or "").strip()
+            api_key = (_text("api key (optional)") or "").strip()
+            if api_key:
+                ep.api_key = api_key
+                self.config.save(self.config_path)
 
         specialist = Specialist(
             name=name,
