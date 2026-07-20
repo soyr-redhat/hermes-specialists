@@ -41,8 +41,6 @@ class GlobalConfig(BaseModel):
     default_endpoint: VLLMEndpoint = Field(default_factory=VLLMEndpoint)
     endpoints: list[VLLMEndpoint] = Field(default_factory=list)
     registry: RegistryConfig = Field(default_factory=RegistryConfig)
-    specialists_dir: str = "specialists"
-
     def get_endpoint(self, name: str) -> VLLMEndpoint | None:
         for ep in self.endpoints:
             if ep.name == name:

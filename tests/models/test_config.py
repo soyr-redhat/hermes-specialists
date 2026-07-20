@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import yaml
-
 from hermes_specialists.models import GlobalConfig, RegistryConfig, VLLMEndpoint
 
 

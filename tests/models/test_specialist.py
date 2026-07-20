@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from hermes_specialists.models import Specialist
 
 

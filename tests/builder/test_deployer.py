@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from hermes_specialists.builder.deployer import (
@@ -10,7 +9,6 @@ from hermes_specialists.builder.deployer import (
     generate_deployment,
     write_deployment,
 )
-from hermes_specialists.models import Specialist
 
 
 class TestGenerateDeployment:

@@ -412,10 +412,10 @@ class HermesSpecialistsApp:
 
     def _endpoints(self) -> None:
         while True:
-            ep = self.config.default_endpoint
+            default_ep = self.config.default_endpoint
             console.print()
-            console.print(f"  [bold red]{ep.name}[/bold red] [dim](default)[/dim]")
-            console.print(f"    [dim]{ep.base_url}  ·  model: {ep.model or '(auto)'}[/dim]")
+            console.print(f"  [bold red]{default_ep.name}[/bold red] [dim](default)[/dim]")
+            console.print(f"    [dim]{default_ep.base_url}  ·  model: {default_ep.model or '(auto)'}[/dim]")
             for ep in self.config.endpoints:
                 console.print(f"  [bold red]{ep.name}[/bold red]")
                 console.print(f"    [dim]{ep.base_url}  ·  model: {ep.model or '(auto)'}[/dim]")
@@ -435,10 +435,10 @@ class HermesSpecialistsApp:
         if not name:
             return
         url = _text("base url", default="http://localhost:8000/v1") or "http://localhost:8000/v1"
-        key_env = _text("api key (optional)") or ""
+        api_key = _text("api key (optional)") or ""
         model = _text("model (optional)") or ""
 
-        endpoint = VLLMEndpoint(name=name.strip(), base_url=url.strip(), api_key=key_env.strip(), model=model.strip())
+        endpoint = VLLMEndpoint(name=name.strip(), base_url=url.strip(), api_key=api_key.strip(), model=model.strip())
         self.config.endpoints = [ep for ep in self.config.endpoints if ep.name != name.strip()]
         self.config.endpoints.append(endpoint)
         self.config.save(self.config_path)
@@ -477,14 +477,7 @@ class HermesSpecialistsApp:
             ])
             if action is None:
                 return
-            if action == "one":
-                self._build_one()
-            elif action == "all":
-                self._build_all()
-            elif action == "deploy":
-                self._deploy_one()
-            elif action == "deploy_all":
-                self._deploy_all()
+            {"one": self._build_one, "all": self._build_all, "deploy": self._deploy_one, "deploy_all": self._deploy_all}[action]()
 
     def _build_one(self) -> None:
         name = self._pick_specialist("build")

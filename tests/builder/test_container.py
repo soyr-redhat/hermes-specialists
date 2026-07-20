@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import yaml
 
@@ -14,7 +13,7 @@ from hermes_specialists.builder.container import (
     prepare_build_context,
     push_image,
 )
-from hermes_specialists.models import GlobalConfig, Specialist, VLLMEndpoint
+from hermes_specialists.models import Specialist
 
 
 class TestGenerateConfig:

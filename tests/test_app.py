@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import yaml
-import pytest
 
 from hermes_specialists.app import HermesSpecialistsApp
-from hermes_specialists.models import GlobalConfig, Specialist, VLLMEndpoint
+from hermes_specialists.models import GlobalConfig, Specialist
 
 
 MODULE = "hermes_specialists.app"
