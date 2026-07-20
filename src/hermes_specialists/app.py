@@ -76,6 +76,7 @@ def _select(message: str, choices: list, back: bool = True) -> str | None:
             amark="▸",
             style=STYLE,
             mandatory=False,
+            keybindings={"skip": [{"key": "left"}]},
         ).execute()
     except (KeyboardInterrupt, EOFError):
         return None
