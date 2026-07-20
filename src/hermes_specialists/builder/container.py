@@ -130,7 +130,7 @@ def build_image(
     )
 
     tag = config.registry.image_ref(specialist.dir_name)
-    cmd = ["podman", "build", "-t", tag, "-f", "Containerfile", "."]
+    cmd = ["podman", "build", "--platform", "linux/amd64", "-t", tag, "-f", "Containerfile", "."]
 
     if log_callback:
         log_callback(f"$ {' '.join(cmd)}")
