@@ -446,7 +446,8 @@ class HermesSpecialistsApp:
             action = _select("build & deploy", [
                 Choice("one", name="build one specialist"),
                 Choice("all", name="build all"),
-                Choice("deploy", name="deploy to openshift"),
+                Choice("deploy", name="deploy one to openshift"),
+                Choice("deploy_all", name="deploy all to openshift"),
             ])
             if action is None:
                 return
@@ -456,6 +457,8 @@ class HermesSpecialistsApp:
                 self._build_all()
             elif action == "deploy":
                 self._deploy_one()
+            elif action == "deploy_all":
+                self._deploy_all()
 
     def _build_one(self) -> None:
         name = self._pick_specialist("build")
@@ -503,6 +506,33 @@ class HermesSpecialistsApp:
         console.print(f"\n  [bold]deploying {s.name}...[/bold]")
         ok = deploy(s, self.config, self.project_root, log_callback=log)
         console.print(f"  [green]✓[/green] deployed\n" if ok else f"  [red]✗ deploy failed[/red]\n")
+
+    def _deploy_all(self) -> None:
+        from hermes_specialists.builder.container import build_image, push_image
+        from hermes_specialists.builder.deployer import deploy
+
+        specialists = Specialist.discover(self.specialists_dir)
+        if not specialists:
+            console.print("  [dim]no specialists to deploy[/dim]")
+            return
+
+        log = lambda m: console.print(f"  {m}")
+        for s in specialists:
+            console.print(f"\n  [bold]building {s.name}...[/bold]")
+            if not build_image(s, self.config, self.project_root, log_callback=log):
+                console.print(f"  [red]✗ build failed for {s.name}, skipping[/red]")
+                continue
+
+            console.print(f"\n  [bold]pushing {s.name}...[/bold]")
+            if not push_image(s, self.config, log_callback=log):
+                console.print(f"  [red]✗ push failed for {s.name}, skipping[/red]")
+                continue
+
+            console.print(f"\n  [bold]deploying {s.name}...[/bold]")
+            ok = deploy(s, self.config, self.project_root, log_callback=log)
+            icon = "[green]✓[/green]" if ok else "[red]✗[/red]"
+            console.print(f"  {icon} {s.name}")
+        console.print()
 
     # ── config ───────────────────────────────────────────────────────────
 
