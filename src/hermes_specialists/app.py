@@ -144,6 +144,8 @@ class HermesSpecialistsApp:
                 Choice("endpoints", name="configure vllm endpoints"),
                 Choice("build", name="build & deploy containers"),
                 Choice("config", name="view configuration"),
+                Separator(),
+                Choice("help", name="help & troubleshooting"),
             ], back=False)
 
             if action is None:
@@ -155,6 +157,7 @@ class HermesSpecialistsApp:
                 "endpoints": self._endpoints,
                 "build": self._build,
                 "config": self._show_config,
+                "help": self._help,
             }[action]()
 
     def _status(self) -> None:
@@ -545,3 +548,101 @@ class HermesSpecialistsApp:
         console.print(f"  [dim]base image[/dim]   {self.config.registry.base_image}")
         console.print(f"  [dim]endpoint[/dim]     {self.config.default_endpoint.display}")
         console.print()
+
+    # ── help ────────────────────────────────────────────────────────────
+
+    def _help(self) -> None:
+        while True:
+            action = _select("help & troubleshooting", [
+                Choice("oc", name="openshift / oc issues"),
+                Choice("podman", name="podman / container issues"),
+                Choice("quay", name="quay.io / registry issues"),
+                Choice("skills", name="how skills work"),
+            ])
+            if action is None:
+                return
+            {"oc": self._help_oc, "podman": self._help_podman, "quay": self._help_quay, "skills": self._help_skills}[action]()
+
+    def _help_oc(self) -> None:
+        console.print("""
+  [bold]openshift / oc troubleshooting[/bold]
+
+  [dim]not logged in?[/dim]
+    oc login <cluster-url> --token=<token>
+
+  [dim]can't find oc?[/dim]
+    download from your cluster's command line tools page
+    add to PATH:  setx PATH "%PATH%;C:\\path\\to\\oc"
+
+  [dim]ErrImagePull?[/dim]
+    make sure the quay.io repo is set to public
+    check:  oc describe pod <name> | grep -A5 Events
+
+  [dim]pod stuck in Init?[/dim]
+    the init container pulls the image — may be slow on first deploy
+    check:  oc describe pod <name>
+
+  [dim]wrong namespace?[/dim]
+    oc project <namespace>
+""")
+
+    def _help_podman(self) -> None:
+        console.print("""
+  [bold]podman / container troubleshooting[/bold]
+
+  [dim]podman not found?[/dim]
+    install:  winget install RedHat.Podman  (windows)
+              brew install podman           (mac)
+
+  [dim]podman machine not running?[/dim]
+    podman machine init    (first time only)
+    podman machine start
+
+  [dim]build failing?[/dim]
+    check that podman machine is running:  podman info
+    try with docker instead if podman won't cooperate
+""")
+
+    def _help_quay(self) -> None:
+        console.print("""
+  [bold]quay.io / registry troubleshooting[/bold]
+
+  [dim]not logged in?[/dim]
+    podman login quay.io
+
+  [dim]push denied?[/dim]
+    check your quay.io credentials:  podman login quay.io
+    make sure the namespace matches your quay username/org
+
+  [dim]images are private by default[/dim]
+    after first push, go to quay.io and set the repo to public
+    settings > make public (free plan can't do this via API)
+""")
+
+    def _help_skills(self) -> None:
+        console.print("""
+  [bold]how skills work[/bold]
+
+  skills are auto-discovered from the specialist's skills/ directory.
+  just create a folder with a SKILL.md file inside:
+
+    specialists/
+      my-bot/
+        system-prompt.md      <- who the agent is
+        specialist.yaml       <- name, endpoint, model
+        skills/
+          my-skill/
+            SKILL.md          <- skill instructions
+
+  the SKILL.md format:
+
+    ---
+    description: what this skill does
+    trigger: when to activate it
+    ---
+
+    instructions for the agent when this skill is activated.
+
+  skills are baked into the container image at build time
+  and copied to the pod on deploy.
+""")
